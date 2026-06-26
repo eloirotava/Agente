@@ -1,10 +1,14 @@
+import difflib
+
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import (
     get_context, get_general_contexts, save_context, delete_context,
-    get_tool, get_all_tools, save_tool, delete_tool
+    get_tool, get_all_tools, save_tool, delete_tool,
+    get_endpoint_versions, get_endpoint_version, restore_endpoint_version,
+    delete_endpoint_version,
 )
 
 router = APIRouter(prefix="/knowledge")
@@ -87,7 +91,8 @@ def system_get():
 def system_post(
     request: Request,
     content: str = Form(...),
-    bootstrap_json: str = Form("")
+    bootstrap_json: str = Form(""),
+    change_note: str = Form("")
 ):
     save_context(
         "system_prompt",
@@ -119,6 +124,9 @@ def tools_get(request: Request, endpoint: str = "", slug: str = "", novo: int = 
             "saved": request.query_params.get("saved"),
             "deleted": request.query_params.get("deleted"),
             "protected": request.query_params.get("protected"),
+            "restored": request.query_params.get("restored"),
+            "version_deleted": request.query_params.get("version_deleted"),
+            "versions": get_endpoint_versions(kind, selected_slug) if endpoint_atual else [],
         }
     )
 
@@ -131,7 +139,8 @@ def tools_post(
     description_for_ai: str = Form(""),
     tool_context: str = Form(""),
     content: str = Form(""),
-    bootstrap_json: str = Form("")
+    bootstrap_json: str = Form(""),
+    change_note: str = Form("")
 ):
     safe_slug = _safe_slug(slug)
     code = content.strip()
@@ -143,15 +152,16 @@ def tools_post(
             "",
             tool_context,
             bootstrap_json=bootstrap_json,
+            change_note=change_note,
         )
         return RedirectResponse(url="/knowledge/tools?endpoint=context:system_prompt&saved=1", status_code=303)
 
     if code:
-        save_tool(safe_slug, title, description_for_ai, tool_context, content)
+        save_tool(safe_slug, title, description_for_ai, tool_context, content, change_note=change_note)
         delete_context(safe_slug)
         return RedirectResponse(url=f"/knowledge/tools?endpoint=tool:{safe_slug}&saved=1", status_code=303)
 
-    save_context(safe_slug, title, description_for_ai, tool_context, bootstrap_json="")
+    save_context(safe_slug, title, description_for_ai, tool_context, bootstrap_json="", change_note=change_note)
     delete_tool(safe_slug)
     return RedirectResponse(url=f"/knowledge/tools?endpoint=context:{safe_slug}&saved=1", status_code=303)
 
@@ -196,7 +206,8 @@ def general_post(
     title: str = Form(...),
     description_for_ai: str = Form(""),
     content: str = Form(...),
-    bootstrap_json: str = Form("")
+    bootstrap_json: str = Form(""),
+    change_note: str = Form("")
 ):
     safe_slug = _safe_slug(slug)
     if safe_slug == "system_prompt":
@@ -206,9 +217,10 @@ def general_post(
             "",
             content,
             bootstrap_json=bootstrap_json,
+            change_note=change_note,
         )
     else:
-        save_context(safe_slug, title, description_for_ai, content, bootstrap_json="")
+        save_context(safe_slug, title, description_for_ai, content, bootstrap_json="", change_note=change_note)
     return RedirectResponse(url=f"/knowledge/tools?endpoint=context:{safe_slug}&saved=1", status_code=303)
 
 
@@ -218,3 +230,53 @@ def general_delete(slug: str):
         return RedirectResponse(url="/knowledge/tools?endpoint=context:system_prompt&protected=1", status_code=303)
     delete_context(slug)
     return RedirectResponse(url="/knowledge/tools?deleted=1", status_code=303)
+
+
+@router.post("/tools/versions/restore/{version_id}")
+def tools_version_restore(version_id: int):
+    version = restore_endpoint_version(version_id)
+    if not version:
+        return RedirectResponse(url="/knowledge/tools", status_code=303)
+    return RedirectResponse(
+        url=f"/knowledge/tools?endpoint={version['endpoint_kind']}:{version['slug']}&restored=1",
+        status_code=303,
+    )
+
+
+@router.post("/tools/versions/delete/{version_id}")
+def tools_version_delete(version_id: int):
+    version = get_endpoint_version(version_id)
+    delete_endpoint_version(version_id)
+    if version:
+        return RedirectResponse(
+            url=f"/knowledge/tools?endpoint={version['endpoint_kind']}:{version['slug']}&version_deleted=1",
+            status_code=303,
+        )
+    return RedirectResponse(url="/knowledge/tools?version_deleted=1", status_code=303)
+
+
+def _version_field(version: dict, field: str) -> str:
+    return str(version.get(field) or "")
+
+
+@router.get("/tools/diff", response_class=HTMLResponse)
+def tools_diff(request: Request, from_id: int, to_id: int):
+    left = get_endpoint_version(from_id)
+    right = get_endpoint_version(to_id)
+    rows = []
+    if left and right:
+        for field in ["title", "description_for_ai", "tool_context", "content", "bootstrap_json"]:
+            diff = difflib.HtmlDiff(wrapcolumn=100).make_table(
+                _version_field(left, field).splitlines(),
+                _version_field(right, field).splitlines(),
+                fromdesc=f"v{left['version_number']} {field}",
+                todesc=f"v{right['version_number']} {field}",
+                context=True,
+                numlines=3,
+            )
+            rows.append({"field": field, "diff": diff})
+    return templates.TemplateResponse(
+        request=request,
+        name="version_diff.html",
+        context={"left": left, "right": right, "rows": rows},
+    )

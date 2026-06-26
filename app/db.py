@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 from app.settings import DEFAULTS
@@ -59,6 +60,35 @@ def init_db():
         )
         """)
 
+
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS endpoint_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            endpoint_kind TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description_for_ai TEXT DEFAULT '',
+            tool_context TEXT DEFAULT '',
+            content TEXT DEFAULT '',
+            bootstrap_json TEXT DEFAULT '',
+            change_note TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            is_deleted_snapshot INTEGER DEFAULT 0,
+            UNIQUE(endpoint_kind, slug, version_number)
+        )
+        """)
+
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS config_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            version_number INTEGER NOT NULL UNIQUE,
+            config_json TEXT NOT NULL,
+            change_note TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
         c.execute("""
         CREATE TABLE IF NOT EXISTS bot_hooks (
             slug TEXT PRIMARY KEY,
@@ -103,7 +133,8 @@ def get_config():
             cfg[r["k"]] = r["v"]
     return cfg
 
-def save_config(data: dict):
+def save_config(data: dict, change_note: str = ""):
+    before = get_config()
     with get_conn() as c:
         for k, v in data.items():
             c.execute("""
@@ -112,6 +143,11 @@ def save_config(data: dict):
             ON CONFLICT(k) DO UPDATE SET v=excluded.v
             """, (k, v))
         c.commit()
+    after = get_config()
+    comparable_before = {k: v for k, v in before.items() if "key" not in k.lower() and "token" not in k.lower()}
+    comparable_after = {k: v for k, v in after.items() if "key" not in k.lower() and "token" not in k.lower()}
+    if comparable_before != comparable_after:
+        record_config_version(after, change_note or "Configuração salva")
 
 def get_context(slug: str):
     with get_conn() as c:
@@ -124,7 +160,8 @@ def get_general_contexts():
         cur = c.execute("SELECT * FROM bot_contexts WHERE slug != 'system_prompt'")
         return [dict(r) for r in cur.fetchall()]
 
-def save_context(slug: str, title: str, description_for_ai: str, content: str, bootstrap_json: str = ""):
+def save_context(slug: str, title: str, description_for_ai: str, content: str, bootstrap_json: str = "", change_note: str = ""):
+    old = get_context(slug)
     with get_conn() as c:
         c.execute("""
         INSERT INTO bot_contexts (slug, title, description_for_ai, content, bootstrap_json)
@@ -136,6 +173,9 @@ def save_context(slug: str, title: str, description_for_ai: str, content: str, b
             bootstrap_json=excluded.bootstrap_json
         """, (slug, title, description_for_ai, content, bootstrap_json))
         c.commit()
+    data = {"title": title, "description_for_ai": description_for_ai, "content": content, "bootstrap_json": bootstrap_json}
+    if not old or any((old.get(k) or "") != (data.get(k) or "") for k in data):
+        record_endpoint_version("context", slug, data, change_note or "Contexto salvo")
 
 #  NOVA FUNÇÃO
 def delete_context(slug: str):
@@ -156,7 +196,8 @@ def get_all_tools():
         cur = c.execute("SELECT * FROM bot_tools")
         return [dict(r) for r in cur.fetchall()]
 
-def save_tool(slug: str, title: str, description_for_ai: str, tool_context: str, content: str):
+def save_tool(slug: str, title: str, description_for_ai: str, tool_context: str, content: str, change_note: str = ""):
+    old = get_tool(slug)
     with get_conn() as c:
         c.execute("""
         INSERT INTO bot_tools (slug, title, description_for_ai, tool_context, content)
@@ -168,6 +209,9 @@ def save_tool(slug: str, title: str, description_for_ai: str, tool_context: str,
             content=excluded.content
         """, (slug, title, description_for_ai, tool_context, content))
         c.commit()
+    data = {"title": title, "description_for_ai": description_for_ai, "tool_context": tool_context, "content": content}
+    if not old or any((old.get(k) or "") != (data.get(k) or "") for k in data):
+        record_endpoint_version("tool", slug, data, change_note or "Endpoint Python salvo")
 
 #  NOVA FUNÇÃO
 def delete_tool(slug: str):
@@ -251,3 +295,132 @@ def delete_hook(slug: str):
     with get_conn() as c:
         c.execute("DELETE FROM bot_hooks WHERE slug = ?", (slug,))
         c.commit()
+
+
+def _next_endpoint_version(c, endpoint_kind: str, slug: str) -> int:
+    cur = c.execute(
+        "SELECT COALESCE(MAX(version_number), 0) + 1 n FROM endpoint_versions WHERE endpoint_kind=? AND slug=?",
+        (endpoint_kind, slug),
+    )
+    return int(cur.fetchone()["n"])
+
+
+def record_endpoint_version(endpoint_kind: str, slug: str, data: dict, change_note: str = "") -> int:
+    with get_conn() as c:
+        version = _next_endpoint_version(c, endpoint_kind, slug)
+        c.execute(
+            """
+            INSERT INTO endpoint_versions (
+                endpoint_kind, slug, version_number, title, description_for_ai,
+                tool_context, content, bootstrap_json, change_note, is_deleted_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                endpoint_kind,
+                slug,
+                version,
+                data.get("title") or slug,
+                data.get("description_for_ai") or "",
+                data.get("tool_context") or "",
+                data.get("content") or "",
+                data.get("bootstrap_json") or "",
+                change_note or "",
+                int(bool(data.get("is_deleted_snapshot"))),
+            ),
+        )
+        c.commit()
+        return version
+
+
+def get_endpoint_versions(endpoint_kind: str, slug: str):
+    with get_conn() as c:
+        cur = c.execute(
+            "SELECT * FROM endpoint_versions WHERE endpoint_kind=? AND slug=? ORDER BY version_number DESC",
+            (endpoint_kind, slug),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def get_endpoint_version(version_id: int):
+    with get_conn() as c:
+        cur = c.execute("SELECT * FROM endpoint_versions WHERE id=?", (version_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def delete_endpoint_version(version_id: int):
+    with get_conn() as c:
+        c.execute("DELETE FROM endpoint_versions WHERE id=?", (version_id,))
+        c.commit()
+
+
+def restore_endpoint_version(version_id: int):
+    version = get_endpoint_version(version_id)
+    if not version:
+        return None
+    if version["endpoint_kind"] == "context":
+        save_context(
+            version["slug"],
+            version["title"],
+            version["description_for_ai"],
+            version["content"],
+            version["bootstrap_json"],
+            change_note=f"Restaurado da v{version['version_number']}",
+        )
+    else:
+        save_tool(
+            version["slug"],
+            version["title"],
+            version["description_for_ai"],
+            version["tool_context"],
+            version["content"],
+            change_note=f"Restaurado da v{version['version_number']}",
+        )
+    return version
+
+
+def _next_config_version(c) -> int:
+    cur = c.execute("SELECT COALESCE(MAX(version_number), 0) + 1 n FROM config_versions")
+    return int(cur.fetchone()["n"])
+
+
+def record_config_version(config: dict, change_note: str = "") -> int:
+    safe_config = dict(config)
+    for key in list(safe_config):
+        if "key" in key.lower() or "token" in key.lower():
+            safe_config[key] = "********" if safe_config.get(key) else ""
+    with get_conn() as c:
+        version = _next_config_version(c)
+        c.execute(
+            "INSERT INTO config_versions (version_number, config_json, change_note) VALUES (?, ?, ?)",
+            (version, json.dumps(safe_config, ensure_ascii=False, sort_keys=True), change_note or ""),
+        )
+        c.commit()
+        return version
+
+
+def get_config_versions():
+    with get_conn() as c:
+        cur = c.execute("SELECT * FROM config_versions ORDER BY version_number DESC")
+        rows = []
+        for r in cur.fetchall():
+            item = dict(r)
+            item["config"] = json.loads(item["config_json"])
+            rows.append(item)
+        return rows
+
+
+def delete_config_version(version_id: int):
+    with get_conn() as c:
+        c.execute("DELETE FROM config_versions WHERE id=?", (version_id,))
+        c.commit()
+
+
+def get_latest_endpoint_version_number(endpoint_kind: str, slug: str) -> int | None:
+    with get_conn() as c:
+        cur = c.execute(
+            "SELECT MAX(version_number) n FROM endpoint_versions WHERE endpoint_kind=? AND slug=?",
+            (endpoint_kind, slug),
+        )
+        value = cur.fetchone()["n"]
+        return int(value) if value is not None else None

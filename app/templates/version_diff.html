@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block page_title %}Diff de versões{% endblock %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header"><div><h2>Comparação de versões</h2><p>{{ left.slug if left else '' }}: v{{ left.version_number if left else '?' }} → v{{ right.version_number if right else '?' }}</p></div><a class="btn secondary-btn" href="/knowledge/tools?endpoint={{ right.endpoint_kind }}:{{ right.slug }}">Voltar</a></div>
+    {% if not left or not right %}<div class="alert danger">Versão não encontrada.</div>{% endif %}
+</section>
+{% for row in rows %}
+<section class="panel diff-panel"><h2>{{ row.field }}</h2>{{ row.diff|safe }}</section>
+{% endfor %}
+{% endblock %}

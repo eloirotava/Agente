@@ -291,6 +291,15 @@
         .alert.info { background: #e8f1ff; color: #175cd3; }
         [data-theme="dark"] .alert.info { background: rgba(23, 92, 211, 0.18); color: #93c5fd; }
 
+
+        .local-panel { position: static; width: auto; height: auto; color: var(--text-main); background: var(--card-bg); padding: 22px; }
+        .diff-panel table.diff { width: 100%; border-collapse: collapse; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82rem; }
+        .diff-panel .diff_header { background: rgba(148, 163, 184, 0.18); font-weight: 800; }
+        .diff-panel td { border: 1px solid var(--border-color); padding: 4px 6px; vertical-align: top; }
+        .diff_add { background: rgba(18, 183, 106, 0.18); }
+        .diff_chg { background: rgba(252, 186, 3, 0.22); }
+        .diff_sub { background: rgba(198, 40, 40, 0.18); }
+
         .record-card {
             border: 1px solid var(--border-color);
             background: var(--card-bg);

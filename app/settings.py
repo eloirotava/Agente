@@ -15,5 +15,7 @@ DEFAULTS = {
     "ca_cert": "",
     "temperature": "0.2",
     "max_tokens": "",
-    "maestro_api_token": MAESTRO_API_TOKEN
+    "maestro_api_token": MAESTRO_API_TOKEN,
+    "llm_provider_mode": "builtin",
+    "llm_provider_code": ""
 }
