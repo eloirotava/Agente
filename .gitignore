@@ -6,6 +6,8 @@ __pycache__/
 # Cextensions
 *.so
 
+*.db
+
 *.dll
 *.pem
 *.csv
