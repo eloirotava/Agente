@@ -17,5 +17,8 @@ DEFAULTS = {
     "max_tokens": "",
     "maestro_api_token": MAESTRO_API_TOKEN,
     "llm_provider_mode": "builtin",
-    "llm_provider_code": ""
+    "llm_provider_code": "",
+    "scheduler_condition_timeout_seconds": "10",
+    "scheduler_maestro_timeout_seconds": "300",
+    "scheduler_max_concurrent_jobs": "1"
 }

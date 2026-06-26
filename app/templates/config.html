@@ -56,6 +56,31 @@
         <input name="api_base" value="{{ cfg.api_base }}"/>
     </div>
 
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Agenda e isolamento</h2>
+                <p>Evita que rotinas pesadas da agenda prendam o event loop que atende o navegador.</p>
+            </div>
+            <span class="badge">anti-travamento</span>
+        </div>
+        <div class="grid-3">
+            <div>
+                <label>Timeout do gatilho Python (s)</label>
+                <input name="scheduler_condition_timeout_seconds" value="{{ cfg.scheduler_condition_timeout_seconds }}"/>
+            </div>
+            <div>
+                <label>Timeout da chamada do Maestro (s)</label>
+                <input name="scheduler_maestro_timeout_seconds" value="{{ cfg.scheduler_maestro_timeout_seconds }}"/>
+            </div>
+            <div>
+                <label>Jobs simultâneos da agenda</label>
+                <input name="scheduler_max_concurrent_jobs" value="{{ cfg.scheduler_max_concurrent_jobs }}"/>
+            </div>
+        </div>
+    </div>
+
     <div class="grid-2">
         <section class="panel">
             <h2>Credenciais e rede</h2>

@@ -28,6 +28,9 @@ def config_post(
     max_tokens: str = Form(""),
     llm_provider_mode: str = Form("builtin"),
     llm_provider_code: str = Form(""),
+    scheduler_condition_timeout_seconds: str = Form("10"),
+    scheduler_maestro_timeout_seconds: str = Form("300"),
+    scheduler_max_concurrent_jobs: str = Form("1"),
     change_note: str = Form("")
 ):
     save_config({
@@ -41,7 +44,10 @@ def config_post(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "llm_provider_mode": llm_provider_mode,
-        "llm_provider_code": llm_provider_code
+        "llm_provider_code": llm_provider_code,
+        "scheduler_condition_timeout_seconds": scheduler_condition_timeout_seconds,
+        "scheduler_maestro_timeout_seconds": scheduler_maestro_timeout_seconds,
+        "scheduler_max_concurrent_jobs": scheduler_max_concurrent_jobs
     }, change_note=change_note)
     return templates.TemplateResponse(
         request=request,
