@@ -1,18 +1,43 @@
 {% extends "base.html" %}
 {% block page_title %}Configurações{% endblock %}
 {% block content %}
-{% if saved %}<div class="alert success">Configurações atualizadas com sucesso.</div>{% endif %}
+{% if saved %}<div class="alert success">Configurações atualizadas e versionadas.</div>{% endif %}
+{% if request.query_params.get('deleted_version') %}<div class="alert danger">Versão de configuração removida.</div>{% endif %}
 
 <form method="post">
     <div class="panel">
         <div class="panel-header">
             <div>
-                <h2>Configurações do modelo</h2>
-                <p>Defina o provedor, o modelo principal e o endpoint usado pelo Maestro.</p>
+                <h2>Interface LLM</h2>
+                <p>Use o provider APIM/OpenAI compatível atual ou troque para uma função Python configurável.</p>
+            </div>
+            <span class="badge">texto / imagem / áudio → texto</span>
+        </div>
+        <div class="grid-2">
+            <div>
+                <label>Modo do provider</label>
+                <select name="llm_provider_mode">
+                    <option value="builtin" {% if cfg.llm_provider_mode != 'python' %}selected{% endif %}>Builtin APIM / OpenAI compatível</option>
+                    <option value="python" {% if cfg.llm_provider_mode == 'python' %}selected{% endif %}>Python def custom</option>
+                </select>
+            </div>
+            <div>
+                <label>Nota da alteração <span class="field-hint">Entra no histórico de configurações.</span></label>
+                <input name="change_note" placeholder="Ex: teste com provider multimodal local"/>
+            </div>
+        </div>
+        <label>Provider Python <span class="field-hint">Defina gerar_resposta(messages, cfg). O conteúdo das mensagens pode ser multimodal se seu backend aceitar.</span></label>
+        <textarea name="llm_provider_code" rows="10" class="code" placeholder="async def gerar_resposta(messages, cfg):&#10;    return '...'">{{ cfg.llm_provider_code }}</textarea>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Configurações do modelo builtin</h2>
+                <p>Usadas quando o modo está em builtin.</p>
             </div>
             <span class="badge">Azure / OpenAI / Gemini</span>
         </div>
-
         <div class="grid-2">
             <div>
                 <label>Provedor</label>
@@ -27,51 +52,42 @@
                 <input name="deployment_id" value="{{ cfg.deployment_id }}"/>
             </div>
         </div>
-
-        <label>URL base da API <span class="field-hint">Para Gemini, use https://generativelanguage.googleapis.com/v1beta/openai</span></label>
+        <label>URL base da API</label>
         <input name="api_base" value="{{ cfg.api_base }}"/>
     </div>
 
     <div class="grid-2">
         <section class="panel">
-            <div class="panel-header">
-                <div>
-                    <h2>Credenciais e rede</h2>
-                    <p>Configure autenticação, certificado e parâmetros específicos do provedor.</p>
-                </div>
-            </div>
-
-            <label>Token / API key <span class="field-hint">Substitui o API_KEY do .env quando preenchido.</span></label>
+            <h2>Credenciais e rede</h2>
+            <label>Token / API key</label>
             <input name="api_key" type="password" autocomplete="off" value="{{ cfg.api_key }}"/>
-
-            <label>Versão da API <span class="field-hint">Aplicável ao Azure/APIM.</span></label>
+            <label>Versão da API</label>
             <input name="api_version" value="{{ cfg.api_version }}"/>
-
-            <label>Certificado corporativo <span class="field-hint">Caminho de arquivo CA bundle; deixe em branco para padrão do sistema. Não coloque token aqui.</span></label>
+            <label>Certificado corporativo</label>
             <input name="ca_cert" value="{{ cfg.ca_cert }}"/>
-
-            <label>Token local do Maestro <span class="field-hint">Protege o endpoint OpenAI compatível /api/maestro. Separado do token/API key do modelo.</span></label>
+            <label>Token local do Maestro</label>
             <input name="maestro_api_token" type="password" autocomplete="off" value="{{ cfg.maestro_api_token }}"/>
         </section>
-
         <section class="panel">
-            <div class="panel-header">
-                <div>
-                    <h2>Parâmetros de geração</h2>
-                    <p>Ajuste o comportamento das respostas geradas pelo modelo.</p>
-                </div>
-            </div>
-
+            <h2>Parâmetros de geração</h2>
             <label>Temperatura</label>
             <input name="temperature" value="{{ cfg.temperature }}"/>
-
             <label>Limite de tokens</label>
             <input name="max_tokens" value="{{ cfg.max_tokens }}"/>
         </section>
     </div>
-
-    <div class="btn-row">
-        <button type="submit">Salvar configurações</button>
-    </div>
+    <div class="btn-row"><button type="submit">Salvar configurações</button></div>
 </form>
+
+<section class="panel">
+    <div class="panel-header"><div><h2>Histórico de configurações</h2><p>Valores sensíveis são mascarados no histórico.</p></div><span class="badge">{{ versions|length }} versões</span></div>
+    {% if not versions %}<div class="alert info">Nenhuma versão registrada ainda.</div>{% endif %}
+    {% for v in versions %}
+    <details class="record-card">
+        <summary><strong>v{{ v.version_number }}</strong> · {{ v.created_at }} · {{ v.change_note or 'sem nota' }}</summary>
+        <pre>{{ v.config_json }}</pre>
+        <form method="post" action="/config/versions/delete/{{ v.id }}" onsubmit="return confirm('Excluir esta versão do histórico?');"><button class="danger-btn" type="submit">Apagar versão</button></form>
+    </details>
+    {% endfor %}
+</section>
 {% endblock %}

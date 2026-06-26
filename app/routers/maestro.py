@@ -14,8 +14,9 @@ from app.db import (
     get_tool,
     get_all_tools,
     log_interaction,
+    get_latest_endpoint_version_number,
 )
-from app.apim_client import call_chat_messages
+from app.llm_gateway import call_llm_messages, config_fingerprint
 
 router = APIRouter(prefix="/api/maestro")
 
@@ -84,6 +85,28 @@ def _messages_to_maestro_prompt(messages: List[OpenAIMessage]) -> str:
 
     return "CONVERSA RECEBIDA VIA API OPENAI-COMPATÍVEL:\n\n" + "\n\n".join(partes)
 
+
+
+def _messages_to_maestro_content(messages: List[OpenAIMessage]) -> Any:
+    """Preserva conteúdo multimodal quando a API receber partes OpenAI-style."""
+    has_multimodal = any(not isinstance(msg.content, str) for msg in messages)
+    if not has_multimodal:
+        return _messages_to_maestro_prompt(messages)
+
+    parts: List[Any] = [
+        {
+            "type": "text",
+            "text": "CONVERSA RECEBIDA VIA API OPENAI-COMPATÍVEL MULTIMODAL. Respeite o protocolo JSON do Maestro.",
+        }
+    ]
+    for msg in messages:
+        role = (msg.role or "user").upper()
+        parts.append({"type": "text", "text": f"[{role}]"})
+        if isinstance(msg.content, list):
+            parts.extend(msg.content)
+        else:
+            parts.append({"type": "text", "text": _content_to_text(msg.content)})
+    return parts
 
 def _openai_chat_response(model: str, content: str) -> dict:
     created = int(time.time())
@@ -228,15 +251,24 @@ async def processar_orquestracao(mensagem: str, origem: str):
     ctx_base = get_context("system_prompt")
     system_prompt = ctx_base["content"] if ctx_base else "Você é um assistente."
 
+    system_version = get_latest_endpoint_version_number("context", "system_prompt") or "?"
+    resource_versions = [f"context:system_prompt@v{system_version}"]
+
     recursos_disponiveis = "\n\nRECURSOS DISPONÍVEIS:"
     tem_recurso = False
 
     for m in get_general_contexts():
+        resource_versions.append(
+            f"context:{m['slug']}@v{get_latest_endpoint_version_number('context', m['slug']) or '?'}"
+        )
         if m.get("description_for_ai"):
             tem_recurso = True
             recursos_disponiveis += f"\n- Endpoint manual '{m['title']}': {m['description_for_ai']}"
 
     for t in get_all_tools():
+        resource_versions.append(
+            f"tool:{t['slug']}@v{get_latest_endpoint_version_number('tool', t['slug']) or '?'}"
+        )
         if t.get("description_for_ai"):
             tem_recurso = True
             recursos_disponiveis += f"\n- Endpoint Python '{t['title']}': {t['description_for_ai']}"
@@ -260,6 +292,8 @@ async def processar_orquestracao(mensagem: str, origem: str):
     log_raciocinio.append(f"[ORIGEM: {origem}]")
     log_raciocinio.append(f"MENSAGEM DO USUÁRIO:\n{mensagem}")
     log_raciocinio.append(f"SYSTEM PROMPT INJETADO (Tamanho: {len(system_prompt)} caracteres)")
+    log_raciocinio.append(f"LLM CONFIG FINGERPRINT: {config_fingerprint(cfg)}")
+    log_raciocinio.append("VERSÕES DOS RECURSOS: " + ", ".join(resource_versions))
 
     bootstrap_json = ""
     if ctx_base and isinstance(ctx_base, dict):
@@ -300,7 +334,7 @@ async def processar_orquestracao(mensagem: str, origem: str):
 
     try:
         for rodada in range(50):
-            resposta_ia = await call_chat_messages(cfg, mensagens)
+            resposta_ia = await call_llm_messages(cfg, mensagens)
 
             log_raciocinio.append(f"--- [RODADA {rodada+1}] ---")
             log_raciocinio.append(f"RAW DA IA:\n{resposta_ia}")
@@ -370,6 +404,6 @@ async def endpoint_maestro(req: OpenAIChatRequest, request: Request):
     if req.stream:
         raise HTTPException(status_code=400, detail="stream=true ainda não é suportado pelo Maestro local.")
 
-    mensagem = _messages_to_maestro_prompt(req.messages)
+    mensagem = _messages_to_maestro_content(req.messages)
     resultado = await processar_orquestracao(mensagem, req.origem)
     return _openai_chat_response(req.model, resultado["resposta_final"])
