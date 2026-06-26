@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block page_title %}Log{% endblock %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Log</h2>
+            <p>Registro cronológico das solicitações, decisões do Maestro, endpoints acionados e respostas finais.</p>
+        </div>
+        <form method="post" action="/logs/clear" onsubmit="return confirm('Tem certeza que deseja apagar permanentemente todos os registros de log?');">
+            <button type="submit" class="danger-btn">Limpar log</button>
+        </form>
+    </div>
+
+    {% if cleared %}
+    <div class="alert danger">Todos os registros de log foram removidos.</div>
+    {% endif %}
+
+    {% if not logs %}
+    <div class="alert info">Nenhuma interação registrada até o momento.</div>
+    {% else %}
+        {% for log in logs %}
+        <div class="record-card">
+            <div class="panel-header" style="margin-bottom: 8px;">
+                <div>
+                    <span class="badge">{{ log.timestamp }}</span>
+                    <h3 style="margin-top: 12px;">Solicitação registrada</h3>
+                </div>
+            </div>
+            <p><strong>Entrada:</strong><br>{{ log.mensagem_usuario }}</p>
+            <details>
+                <summary>Rastreabilidade do Maestro</summary>
+                <pre>{{ log.log_raciocinio }}</pre>
+            </details>
+            <p><strong>Resposta final:</strong></p>
+            <pre>{{ log.resposta_final }}</pre>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

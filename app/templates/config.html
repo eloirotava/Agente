@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block page_title %}Configurações{% endblock %}
+{% block content %}
+{% if saved %}<div class="alert success">Configurações atualizadas com sucesso.</div>{% endif %}
+
+<form method="post">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Configurações do modelo</h2>
+                <p>Defina o provedor, o modelo principal e o endpoint usado pelo Maestro.</p>
+            </div>
+            <span class="badge">Azure / OpenAI / Gemini</span>
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <label>Provedor</label>
+                <select name="api_provider">
+                    <option value="azure" {% if cfg.api_provider == 'azure' %}selected{% endif %}>Microsoft Azure / APIM Corporativo</option>
+                    <option value="openai" {% if cfg.api_provider == 'openai' %}selected{% endif %}>OpenAI compatível / Endpoint local</option>
+                    <option value="gemini" {% if cfg.api_provider == 'gemini' or cfg.api_provider == 'google' %}selected{% endif %}>Google Gemini API (OpenAI compatível)</option>
+                </select>
+            </div>
+            <div>
+                <label>Modelo principal</label>
+                <input name="deployment_id" value="{{ cfg.deployment_id }}"/>
+            </div>
+        </div>
+
+        <label>URL base da API <span class="field-hint">Para Gemini, use https://generativelanguage.googleapis.com/v1beta/openai</span></label>
+        <input name="api_base" value="{{ cfg.api_base }}"/>
+    </div>
+
+    <div class="grid-2">
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2>Credenciais e rede</h2>
+                    <p>Configure autenticação, certificado e parâmetros específicos do provedor.</p>
+                </div>
+            </div>
+
+            <label>Token / API key <span class="field-hint">Substitui o API_KEY do .env quando preenchido.</span></label>
+            <input name="api_key" type="password" autocomplete="off" value="{{ cfg.api_key }}"/>
+
+            <label>Versão da API <span class="field-hint">Aplicável ao Azure/APIM.</span></label>
+            <input name="api_version" value="{{ cfg.api_version }}"/>
+
+            <label>Certificado corporativo <span class="field-hint">Caminho de arquivo CA bundle; deixe em branco para padrão do sistema. Não coloque token aqui.</span></label>
+            <input name="ca_cert" value="{{ cfg.ca_cert }}"/>
+
+            <label>Token local do Maestro <span class="field-hint">Protege o endpoint OpenAI compatível /api/maestro. Separado do token/API key do modelo.</span></label>
+            <input name="maestro_api_token" type="password" autocomplete="off" value="{{ cfg.maestro_api_token }}"/>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2>Parâmetros de geração</h2>
+                    <p>Ajuste o comportamento das respostas geradas pelo modelo.</p>
+                </div>
+            </div>
+
+            <label>Temperatura</label>
+            <input name="temperature" value="{{ cfg.temperature }}"/>
+
+            <label>Limite de tokens</label>
+            <input name="max_tokens" value="{{ cfg.max_tokens }}"/>
+        </section>
+    </div>
+
+    <div class="btn-row">
+        <button type="submit">Salvar configurações</button>
+    </div>
+</form>
+{% endblock %}

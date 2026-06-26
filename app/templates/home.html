@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block page_title %}Status do Serviço{% endblock %}
+{% block content %}
+<div class="health-hero panel">
+    <div>
+        <span class="badge"><span class="status-dot"></span>Serviço local</span>
+        <h2>Core operacional do Agente Rotava</h2>
+        <p>Visão compacta dos sinais mínimos para saber se o console local está pronto para atendimento, automações e curadoria técnica.</p>
+    </div>
+    <div class="health-status-list">
+        <div><span>Credencial</span><strong>{{ "API_KEY configurada" if health.api_key_set else "API_KEY ausente" }}</strong></div>
+        <div><span>Provedor</span><strong>{{ health.provider|upper }}</strong></div>
+        <div><span>Banco</span><strong>{{ health.db_size_mb }} MB</strong></div>
+    </div>
+</div>
+
+<div class="health-metrics">
+    <div class="metric-card">
+        <span>Manuais</span>
+        <strong>{{ health.total_docs }}</strong>
+        <small>{{ health.announced_docs }} anunciados</small>
+    </div>
+    <div class="metric-card">
+        <span>Endpoints Python</span>
+        <strong>{{ health.total_tools }}</strong>
+        <small>{{ health.announced_tools }} anunciados</small>
+    </div>
+    <div class="metric-card">
+        <span>Automações</span>
+        <strong>{{ health.active_tasks }}</strong>
+        <small>{{ health.total_tasks }} cadastradas</small>
+    </div>
+    <div class="metric-card">
+        <span>Hooks</span>
+        <strong>{{ health.active_hooks }}</strong>
+        <small>{{ health.total_hooks }} cadastrados</small>
+    </div>
+    <div class="metric-card">
+        <span>Log</span>
+        <strong>{{ health.total_logs }}</strong>
+        <small>registros</small>
+    </div>
+</div>
+
+<div class="grid-2 health-grid">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Diagnóstico técnico</h2>
+                <p>Campos longos são quebrados para evitar estouro de layout em telas menores.</p>
+            </div>
+        </div>
+
+        <dl class="health-details">
+            <div>
+                <dt>Modelo principal</dt>
+                <dd>{{ health.deployment_id or "Não definido" }}</dd>
+            </div>
+            <div>
+                <dt>Banco SQLite</dt>
+                <dd>{{ health.db_path }}</dd>
+            </div>
+            <div>
+                <dt>Última interação</dt>
+                <dd>{{ health.last_log_at }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Watchdog do agendador</h2>
+                <p>Último sinal registrado pelo worker periódico.</p>
+            </div>
+        </div>
+        <div class="health-watchdog">
+            {{ health.watchdog }}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cextensions
+*.so
+
+*.dll
+*.pem
+*.csv
+
+# Distribution / packaging
+bin/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Ambientes Virtuais (O mais importante para você agora!)
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Arquivos do Git Portátil (MinGit) que baixamos localmente
+.venv/MinGit/
+
+# Pipenv e Poetry (se usar no futuro)
+Pipfile.lock
+poetry.lock
+
+# Caches de ferramentas de testes e qualidade
+.toml
+.cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Configurações de editores de código (VS Code, PyCharm)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Arquivos do sistema operacional
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Configurações locais/sensíveis
+custom/conf/app.ini

@@ -1,0 +1,154 @@
+import asyncio
+from pathlib import Path
+from urllib.parse import quote
+
+import httpx
+
+from app.settings import API_KEY
+
+OPENAI_COMPATIBLE_PROVIDERS = {"openai", "gemini", "google"}
+
+
+def _get_api_key(cfg: dict) -> str:
+    return (cfg.get("api_key") or API_KEY or "").strip()
+
+
+def _build_verify_option(cfg: dict, *, default: bool = True):
+    ca_cert_val = str(cfg.get("ca_cert", "")).strip()
+    if ca_cert_val.lower() == "false":
+        return False
+    if ca_cert_val:
+        ca_cert_path = Path(ca_cert_val).expanduser()
+        if not ca_cert_path.is_file():
+            raise RuntimeError(
+                "Certificado corporativo inválido: o caminho informado não existe ou não é arquivo: "
+                f"{ca_cert_val}. Deixe o campo em branco para usar os certificados padrão do "
+                "sistema, use 'false' apenas para desabilitar a validação TLS em ambiente local/teste, "
+                "ou informe o caminho completo de um CA bundle válido."
+            )
+        return str(ca_cert_path)
+    return default
+
+
+def _join_chat_completions_url(api_base: str) -> str:
+    base = api_base.rstrip("/")
+    if base.endswith("/chat/completions"):
+        return base
+    return f"{base}/chat/completions"
+
+
+def _extract_message_content(data: dict) -> str:
+    choices = data.get("choices")
+    if not choices:
+        raise RuntimeError(
+            "O servidor respondeu com sucesso (HTTP 200), mas não trouxe 'choices'. "
+            f"Resposta bruta: {data}"
+        )
+
+    message = choices[0].get("message") or {}
+    content = message.get("content")
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        partes = []
+        for item in content:
+            if isinstance(item, dict):
+                texto = item.get("text") or item.get("content")
+                if isinstance(texto, str):
+                    partes.append(texto)
+            elif isinstance(item, str):
+                partes.append(item)
+        if partes:
+            return "\n".join(partes)
+
+    raise RuntimeError(
+        "O servidor respondeu com sucesso (HTTP 200), mas o conteúdo da mensagem veio vazio "
+        f"ou em formato não suportado. Resposta bruta: {data}"
+    )
+
+
+def _build_chat_request(cfg: dict) -> tuple[str, str, dict, dict, dict, object]:
+    provider = cfg.get("api_provider", "azure").lower().strip()
+    api_key = _get_api_key(cfg)
+
+    headers = {
+        "Connection": "close",
+    }
+    params = {}
+
+    body = {
+        "messages": [],
+        "temperature": float(cfg.get("temperature") or 0.2),
+    }
+
+    if cfg.get("max_tokens"):
+        body["max_tokens"] = int(cfg["max_tokens"])
+
+    if provider == "azure":
+        if not api_key:
+            raise RuntimeError("Token/API key não definido nas Configurações nem no .env")
+        url = f"{cfg['api_base'].rstrip('/')}/deployments/{quote(cfg['deployment_id'])}/chat/completions"
+        params = {"api-version": cfg["api_version"]}
+        headers["api-key"] = api_key
+        verify_opt = _build_verify_option(cfg, default=True)
+        return provider, url, params, headers, body, verify_opt
+
+    if provider in OPENAI_COMPATIBLE_PROVIDERS:
+        if provider in {"gemini", "google"} and not api_key:
+            raise RuntimeError("Token/API key não definido nas Configurações nem no .env para usar a API Gemini")
+        url = _join_chat_completions_url(cfg["api_base"])
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        body["model"] = cfg.get("model") or cfg.get("deployment_id")
+        verify_opt = _build_verify_option(cfg, default=True)
+        return provider, url, params, headers, body, verify_opt
+
+    raise RuntimeError(
+        f"Provedor de API desconhecido: {provider}. Use 'azure', 'openai' ou 'gemini'."
+    )
+
+
+async def call_chat_messages(cfg: dict, messages: list) -> str:
+    _, url, params, headers, body, verify_opt = _build_chat_request(cfg)
+    body["messages"] = messages
+
+    timeout = httpx.Timeout(connect=150.0, read=900.0, write=300.0, pool=300.0)
+    max_tentativas = 3
+    ultima_exc = None
+
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            async with httpx.AsyncClient(verify=verify_opt, timeout=timeout) as client:
+                r = await client.post(url, params=params, headers=headers, json=body)
+
+            if 500 <= r.status_code <= 599:
+                raise httpx.HTTPStatusError(
+                    f"Erro {r.status_code} do servidor. Resposta: {r.text}",
+                    request=r.request,
+                    response=r,
+                )
+
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                raise httpx.HTTPStatusError(
+                    f"Erro {r.status_code} ao chamar {url}. Resposta: {r.text}",
+                    request=e.request,
+                    response=e.response,
+                ) from e
+
+            data = r.json()
+            return _extract_message_content(data)
+
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError, httpx.HTTPStatusError) as e:
+            ultima_exc = e
+
+            if tentativa >= max_tentativas:
+                raise
+
+            espera = 2 ** (tentativa - 1)
+            await asyncio.sleep(espera)
+
+    raise RuntimeError(f"Falha inesperada ao chamar API: {ultima_exc}")

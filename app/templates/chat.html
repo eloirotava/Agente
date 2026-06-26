@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block page_title %}Assistente{% endblock %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Consulta assistida pelo Maestro</h2>
+            <p>Envie uma pergunta operacional ou técnica. O Agente Rotava consulta a endpoints disponíveis quando necessário.</p>
+        </div>
+        <span class="badge">Maestro Orquestrador</span>
+    </div>
+
+    <form method="post">
+        <label>Mensagem</label>
+        <textarea name="message" rows="7" placeholder="Descreva a dúvida, anomalia ou investigação desejada...">{{ message or "" }}</textarea>
+        <div class="btn-row">
+            <button type="submit">Enviar ao Maestro</button>
+        </div>
+    </form>
+</div>
+
+{% if answer %}
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Resposta consolidada</h2>
+            <p>Resultado final retornado pelo orquestrador.</p>
+        </div>
+    </div>
+    <pre>{{ answer }}</pre>
+</div>
+{% endif %}
+
+{% if logs %}
+<div class="panel">
+    <h2>Rastreabilidade da execução</h2>
+    <p>Resumo técnico das etapas executadas pelo Maestro.</p>
+    <details open>
+        <summary>Ver log de raciocínio</summary>
+        <pre>{% for log in logs %}{{ log }}
+
+{% endfor %}</pre>
+    </details>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block page_title %}Endpoints{% endblock %}
+{% block content %}
+{% set is_base = endpoint_atual and endpoint_atual.slug == 'system_prompt' %}
+{% set is_python = endpoint_kind == 'tool' %}
+{% if saved %}<div class="alert success">Endpoint salvo com sucesso.</div>{% endif %}
+{% if deleted %}<div class="alert danger">Endpoint removido.</div>{% endif %}
+{% if protected %}<div class="alert info">O contexto inicial é protegido e não pode ser removido.</div>{% endif %}
+
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Endpoints do Maestro</h2>
+                <p>Gerencie o contexto inicial, manuais e endpoints Python em uma única lista.</p>
+            </div>
+        </div>
+
+        <form method="get" action="/knowledge/tools">
+            <label>Endpoint selecionado</label>
+            <select name="endpoint" onchange="this.form.submit()">
+                <option value="">Novo endpoint</option>
+                {% for endpoint in endpoints %}
+                <option value="{{ endpoint.select_value }}" {% if endpoint.select_value == endpoint_selecionado %}selected{% endif %}>
+                    {{ endpoint.title }} · {{ endpoint.kind_label }}{% if endpoint.slug == 'system_prompt' %} · protegido{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+        <div class="btn-row">
+            <a href="/knowledge/tools?novo=1" class="btn secondary-btn">Novo endpoint</a>
+        </div>
+
+        <div class="alert info" style="margin-top: 18px;">
+            Sem código Python, o endpoint funciona como manual/contexto consultável. Com código Python, ele mantém o comportamento executável atual.
+        </div>
+    </div>
+
+    <div>
+        <form id="formTool" method="post" action="/knowledge/tools" class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2>{{ 'Contexto inicial' if is_base else ('Editar endpoint' if endpoint_atual else 'Novo endpoint') }}</h2>
+                    <p>{{ 'Diretriz base usada como system prompt do Maestro.' if is_base else 'Preencha o contexto e, opcionalmente, o código Python executar(cmd).' }}</p>
+                </div>
+                {% if is_base %}<span class="badge">Protegido</span>{% elif is_python %}<span class="badge">Python</span>{% else %}<span class="badge">Manual</span>{% endif %}
+            </div>
+
+            <label>Identificador técnico</label>
+            <input type="text" name="slug" value="{{ endpoint_atual.slug if endpoint_atual else '' }}" required {% if endpoint_atual %}readonly{% endif %} placeholder="ex: consultar_pi">
+
+            <label>Nome corporativo</label>
+            <input type="text" name="title" value="{{ 'Diretriz Operacional Base' if is_base else (endpoint_atual.title if endpoint_atual else '') }}" required {% if is_base %}readonly{% endif %} placeholder="Ex: Consulta PI System">
+
+            {% if not is_base %}
+            <label>Resumo para o Maestro <span class="field-hint">Opcional. Se ficar em branco, o endpoint não é anunciado no contexto inicial.</span></label>
+            <textarea name="description_for_ai" rows="3" placeholder='Ex: Para consultar dados históricos do PI, use a ação "consultar_pi".'>{{ endpoint_atual.description_for_ai if endpoint_atual else '' }}</textarea>
+            {% else %}
+            <input type="hidden" name="description_for_ai" value="">
+            {% endif %}
+
+            <label>{{ 'Conteúdo do contexto inicial' if is_base else 'Contexto / manual do endpoint' }}</label>
+            <textarea name="tool_context" rows="8" class="code" placeholder="Descreva parâmetros esperados, exemplos de JSON, limitações operacionais ou o conteúdo manual consultável.">{{ endpoint_atual.content if endpoint_atual and endpoint_kind == 'context' else (endpoint_atual.tool_context if endpoint_atual else '') }}</textarea>
+
+            {% if is_base %}
+            <label>Bootstrap JSON <span class="field-hint">Opcional. Lista de pré-ações executadas antes da primeira chamada ao modelo.</span></label>
+            <textarea name="bootstrap_json" rows="5" class="code" placeholder='[{"acao":"ler_contexto","slug":"tags_pi"}]'>{{ endpoint_atual.bootstrap_json if endpoint_atual and endpoint_atual.bootstrap_json else '' }}</textarea>
+            {% endif %}
+
+            {% if not is_base %}
+            <label>Código Python opcional <span class="field-hint">Se preenchido, deve expor a função executar(cmd). Se ficar em branco, o endpoint será tratado como manual.</span></label>
+            <textarea name="content" rows="12" class="code" placeholder="def executar(cmd: dict):&#10;    return 'resultado'">{{ endpoint_atual.content if endpoint_atual and endpoint_kind == 'tool' else '' }}</textarea>
+            {% else %}
+            <input type="hidden" name="content" value="">
+            {% endif %}
+        </form>
+
+        <div class="btn-row">
+            <button type="submit" form="formTool">Salvar endpoint</button>
+            {% if endpoint_atual and not is_base %}
+            <form method="post" action="/knowledge/tools/delete/{{ endpoint_kind }}/{{ endpoint_atual.slug }}" onsubmit="return confirm('Confirma a exclusão permanente deste endpoint?');">
+                <button type="submit" class="danger-btn">Excluir endpoint</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
