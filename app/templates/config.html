@@ -8,63 +8,28 @@
     <div class="panel">
         <div class="panel-header">
             <div>
-                <h2>Interface LLM</h2>
-                <p>Use o provider APIM/OpenAI compatível atual ou troque para uma função Python configurável.</p>
+                <h2>Modelo via def Python</h2>
+                <p>Todo o provider do LLM fica aqui: URL, modelo, autenticação, multimodalidade, timeouts e parâmetros.</p>
             </div>
-            <span class="badge">texto / imagem / áudio → texto</span>
+            <span class="badge">def única</span>
         </div>
-        <div class="grid-2">
-            <div>
-                <label>Modo do provider</label>
-                <select name="llm_provider_mode">
-                    <option value="builtin" {% if cfg.llm_provider_mode != 'python' %}selected{% endif %}>Builtin APIM / OpenAI compatível</option>
-                    <option value="python" {% if cfg.llm_provider_mode == 'python' %}selected{% endif %}>Python def custom</option>
-                </select>
-            </div>
-            <div>
-                <label>Nota da alteração <span class="field-hint">Entra no histórico de configurações.</span></label>
-                <input name="change_note" placeholder="Ex: teste com provider multimodal local"/>
-            </div>
-        </div>
-        <label>Provider Python <span class="field-hint">Defina gerar_resposta(messages, cfg). O conteúdo das mensagens pode ser multimodal se seu backend aceitar.</span></label>
-        <textarea name="llm_provider_code" rows="10" class="code" placeholder="async def gerar_resposta(messages, cfg):&#10;    return '...'">{{ cfg.llm_provider_code }}</textarea>
+        <div class="alert info">Defina <code>gerar_resposta(messages, cfg)</code> ou <code>executar(messages, cfg)</code>. O Maestro sempre envia a lista <code>messages</code> e espera texto de volta.</div>
+        <label>Def do modelo</label>
+        <textarea name="llm_provider_code" rows="18" class="code" placeholder="async def gerar_resposta(messages, cfg):&#10;    return '...';">{{ cfg.llm_provider_code }}</textarea>
+        <label>Nota da alteração <span class="field-hint">Entra no histórico de configurações.</span></label>
+        <input name="change_note" placeholder="Ex: troquei modelo, URL ou parâmetros dentro da def"/>
     </div>
 
     <div class="panel">
         <div class="panel-header">
             <div>
-                <h2>Configurações do modelo builtin</h2>
-                <p>Usadas quando o modo está em builtin.</p>
+                <h2>Operação local</h2>
+                <p>Configurações do runtime do agente, separadas do modelo.</p>
             </div>
-            <span class="badge">Azure / OpenAI / Gemini</span>
+            <span class="badge">agente</span>
         </div>
-        <div class="grid-2">
-            <div>
-                <label>Provedor</label>
-                <select name="api_provider">
-                    <option value="azure" {% if cfg.api_provider == 'azure' %}selected{% endif %}>Microsoft Azure / APIM Corporativo</option>
-                    <option value="openai" {% if cfg.api_provider == 'openai' %}selected{% endif %}>OpenAI compatível / Endpoint local</option>
-                    <option value="gemini" {% if cfg.api_provider == 'gemini' or cfg.api_provider == 'google' %}selected{% endif %}>Google Gemini API (OpenAI compatível)</option>
-                </select>
-            </div>
-            <div>
-                <label>Modelo principal</label>
-                <input name="deployment_id" value="{{ cfg.deployment_id }}"/>
-            </div>
-        </div>
-        <label>URL base da API</label>
-        <input name="api_base" value="{{ cfg.api_base }}"/>
-    </div>
-
-
-    <div class="panel">
-        <div class="panel-header">
-            <div>
-                <h2>Agenda e isolamento</h2>
-                <p>Evita que rotinas pesadas da agenda prendam o event loop que atende o navegador.</p>
-            </div>
-            <span class="badge">anti-travamento</span>
-        </div>
+        <label>Token local do Maestro <span class="field-hint">Protege /api/maestro; não é token do modelo.</span></label>
+        <input name="maestro_api_token" type="password" autocomplete="off" value="{{ cfg.maestro_api_token }}"/>
         <div class="grid-3">
             <div>
                 <label>Timeout do gatilho Python (s)</label>
@@ -80,32 +45,11 @@
             </div>
         </div>
     </div>
-
-    <div class="grid-2">
-        <section class="panel">
-            <h2>Credenciais e rede</h2>
-            <label>Token / API key</label>
-            <input name="api_key" type="password" autocomplete="off" value="{{ cfg.api_key }}"/>
-            <label>Versão da API</label>
-            <input name="api_version" value="{{ cfg.api_version }}"/>
-            <label>Certificado corporativo</label>
-            <input name="ca_cert" value="{{ cfg.ca_cert }}"/>
-            <label>Token local do Maestro</label>
-            <input name="maestro_api_token" type="password" autocomplete="off" value="{{ cfg.maestro_api_token }}"/>
-        </section>
-        <section class="panel">
-            <h2>Parâmetros de geração</h2>
-            <label>Temperatura</label>
-            <input name="temperature" value="{{ cfg.temperature }}"/>
-            <label>Limite de tokens</label>
-            <input name="max_tokens" value="{{ cfg.max_tokens }}"/>
-        </section>
-    </div>
     <div class="btn-row"><button type="submit">Salvar configurações</button></div>
 </form>
 
 <section class="panel">
-    <div class="panel-header"><div><h2>Histórico de configurações</h2><p>Valores sensíveis são mascarados no histórico.</p></div><span class="badge">{{ versions|length }} versões</span></div>
+    <div class="panel-header"><div><h2>Histórico de configurações</h2><p>O histórico registra a def e os parâmetros operacionais; tokens são mascarados.</p></div><span class="badge">{{ versions|length }} versões</span></div>
     {% if not versions %}<div class="alert info">Nenhuma versão registrada ainda.</div>{% endif %}
     {% for v in versions %}
     <details class="record-card">

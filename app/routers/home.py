@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import DB_PATH, get_config, get_conn
-from app.settings import API_KEY
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -43,9 +42,8 @@ def get_health_snapshot():
         watchdog = _scalar(conn, "SELECT v FROM config_kv WHERE k = ?", ("ultimo_scan_watchdog",)) or "Aguardando primeiro ciclo do agendador"
 
     return {
-        "api_key_set": bool(API_KEY),
-        "provider": cfg.get("api_provider", "azure"),
-        "deployment_id": cfg.get("deployment_id", ""),
+        "llm_def_configured": bool((cfg.get("llm_provider_code") or "").strip()),
+        "llm_config_style": "def Python",
         "db_path": str(DB_PATH),
         "db_size_mb": db_size_mb,
         "total_docs": total_docs,

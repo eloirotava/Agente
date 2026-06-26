@@ -5,12 +5,12 @@ import time
 from hashlib import sha256
 from typing import Any
 
-CUSTOM_LLM_TEMPLATE = '''# Defina uma função async ou sync chamada gerar_resposta(messages, cfg).
+CUSTOM_LLM_TEMPLATE = '''# Configure TODO o acesso ao modelo dentro desta def.
 # messages pode conter texto, listas multimodais ou qualquer payload que seu backend aceite.
-# Retorne sempre texto final para o Maestro interpretar.
+# Retorne sempre texto para o Maestro interpretar.
 
 async def gerar_resposta(messages, cfg):
-    return '{"acao":"responder","resposta":"Provider Python configurado."}'
+    return '{"acao":"responder","resposta":"Configure o provider LLM em /config."}'
 '''
 
 
@@ -27,10 +27,12 @@ def config_fingerprint(cfg: dict) -> str:
 async def _call_python_provider(cfg: dict, messages: list[dict[str, Any]]) -> str:
     code = (cfg.get("llm_provider_code") or "").strip()
     if not code:
-        raise RuntimeError("llm_provider_code está vazio.")
+        raise RuntimeError(
+            "llm_provider_code está vazio. Configure gerar_resposta(messages, cfg) em /config."
+        )
 
     scope: dict[str, Any] = {}
-    exec(code, {}, scope)
+    exec(code, scope, scope)
     fn = scope.get("gerar_resposta") or scope.get("executar")
     if not callable(fn):
         raise RuntimeError(
@@ -39,11 +41,13 @@ async def _call_python_provider(cfg: dict, messages: list[dict[str, Any]]) -> st
         )
 
     started = time.perf_counter()
-    result = fn(messages, cfg)
+    if inspect.iscoroutinefunction(fn):
+        result = await fn(messages, cfg)
+    else:
+        result = await asyncio.to_thread(fn, messages, cfg)
+
     if inspect.isawaitable(result):
         result = await result
-    else:
-        result = await asyncio.to_thread(lambda: result)
 
     elapsed = time.perf_counter() - started
     print(
@@ -62,14 +66,5 @@ async def _call_python_provider(cfg: dict, messages: list[dict[str, Any]]) -> st
 
 
 async def call_llm_messages(cfg: dict, messages: list[dict[str, Any]]) -> str:
-    """Ponto único de chamada LLM do core do Maestro."""
-    mode = str(cfg.get("llm_provider_mode") or "builtin").strip().lower()
-    if mode in {"", "builtin", "apim", "openai_compatible"}:
-        from app.apim_client import call_chat_messages
-
-        return await call_chat_messages(cfg, messages)
-    if mode in {"python", "custom_python", "def"}:
-        return await _call_python_provider(cfg, messages)
-    raise RuntimeError(
-        f"llm_provider_mode desconhecido: {mode}. Use builtin ou python."
-    )
+    """Chama sempre o provider definido em Python nas configurações."""
+    return await _call_python_provider(cfg, messages)

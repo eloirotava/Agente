@@ -6,18 +6,18 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY", "").strip()
 MAESTRO_API_TOKEN = os.getenv("MAESTRO_API_TOKEN", "").strip()
 
+DEFAULT_LLM_PROVIDER_CODE = '''# Configure TODO o acesso ao modelo dentro desta def.
+# Exemplo: importe httpx aqui ou dentro da função, defina URL/modelo/token,
+# envie `messages` ao backend e retorne o texto da resposta.
+# Para segredos, prefira ler de variáveis de ambiente com os.getenv().
+
+async def gerar_resposta(messages, cfg):
+    return '{"acao":"responder","resposta":"Configure o provider LLM em /config."}'
+'''
+
 DEFAULTS = {
-    "api_provider": "azure",  # ADICIONADO: azure ou openai
-    "api_base": "https://apit.petrobras.com.br/ia/openai/v1/openai-azure/openai",
-    "deployment_id": "gpt-5-chat-petrobras",
-    "api_version": "2025-01-01-preview",
-    "api_key": "",
-    "ca_cert": "",
-    "temperature": "0.2",
-    "max_tokens": "",
     "maestro_api_token": MAESTRO_API_TOKEN,
-    "llm_provider_mode": "builtin",
-    "llm_provider_code": "",
+    "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
     "scheduler_condition_timeout_seconds": "10",
     "scheduler_maestro_timeout_seconds": "300",
     "scheduler_max_concurrent_jobs": "1"

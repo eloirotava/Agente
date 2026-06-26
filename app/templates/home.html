@@ -8,8 +8,8 @@
         <p>Visão compacta dos sinais mínimos para saber se o console local está pronto para atendimento, automações e curadoria técnica.</p>
     </div>
     <div class="health-status-list">
-        <div><span>Credencial</span><strong>{{ "API_KEY configurada" if health.api_key_set else "API_KEY ausente" }}</strong></div>
-        <div><span>Provedor</span><strong>{{ health.provider|upper }}</strong></div>
+        <div><span>Modelo</span><strong>{{ "def configurada" if health.llm_def_configured else "def ausente" }}</strong></div>
+        <div><span>Provider</span><strong>{{ health.llm_config_style }}</strong></div>
         <div><span>Banco</span><strong>{{ health.db_size_mb }} MB</strong></div>
     </div>
 </div>
@@ -53,8 +53,8 @@
 
         <dl class="health-details">
             <div>
-                <dt>Modelo principal</dt>
-                <dd>{{ health.deployment_id or "Não definido" }}</dd>
+                <dt>Configuração do modelo</dt>
+                <dd>Toda a configuração fica na def Python em /config.</dd>
             </div>
             <div>
                 <dt>Banco SQLite</dt>
