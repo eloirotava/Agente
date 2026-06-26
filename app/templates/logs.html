@@ -5,7 +5,7 @@
     <div class="panel-header">
         <div>
             <h2>Log</h2>
-            <p>Registro cronológico das solicitações, decisões do Maestro, endpoints acionados e respostas finais.</p>
+            <p>Registro cronológico das solicitações, decisões do Maestro, endpoints acionados e respostas finais. Horários exibidos no fuso local do navegador.</p>
         </div>
         <form method="post" action="/logs/clear" onsubmit="return confirm('Tem certeza que deseja apagar permanentemente todos os registros de log?');">
             <button type="submit" class="danger-btn">Limpar log</button>
@@ -23,7 +23,7 @@
         <div class="record-card">
             <div class="panel-header" style="margin-bottom: 8px;">
                 <div>
-                    <span class="badge">{{ log.timestamp }}</span>
+                    <span class="badge log-timestamp" data-utc="{{ log.timestamp }}">{{ log.timestamp }} UTC</span>
                     <h3 style="margin-top: 12px;">Solicitação registrada</h3>
                 </div>
             </div>
@@ -38,4 +38,30 @@
         {% endfor %}
     {% endif %}
 </div>
+
+<script>
+(function () {
+    const formatter = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+    });
+
+    document.querySelectorAll('.log-timestamp[data-utc]').forEach((element) => {
+        const raw = element.dataset.utc;
+        if (!raw) return;
+
+        const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+        const date = new Date(normalized.endsWith('Z') ? normalized : `${normalized}Z`);
+        if (Number.isNaN(date.getTime())) return;
+
+        element.textContent = formatter.format(date);
+        element.title = `${raw} UTC`;
+    });
+})();
+</script>
 {% endblock %}
