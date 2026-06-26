@@ -41,9 +41,12 @@ def get_health_snapshot():
         last_log_at = _scalar(conn, "SELECT MAX(timestamp) FROM interactions_log") or "Sem interações"
         watchdog = _scalar(conn, "SELECT v FROM config_kv WHERE k = ?", ("ultimo_scan_watchdog",)) or "Aguardando primeiro ciclo do agendador"
 
+    llm_provider_code = (cfg.get("llm_provider_code") or "").strip()
+
     return {
-        "llm_def_configured": bool((cfg.get("llm_provider_code") or "").strip()),
-        "llm_config_style": "def Python",
+        "llm_def_configured": bool(llm_provider_code),
+        "llm_def_chars": len(llm_provider_code),
+        "maestro_token_set": bool((cfg.get("maestro_api_token") or "").strip()),
         "db_path": str(DB_PATH),
         "db_size_mb": db_size_mb,
         "total_docs": total_docs,

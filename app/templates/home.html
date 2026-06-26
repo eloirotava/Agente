@@ -8,8 +8,8 @@
         <p>Visão compacta dos sinais mínimos para saber se o console local está pronto para atendimento, automações e curadoria técnica.</p>
     </div>
     <div class="health-status-list">
-        <div><span>Modelo</span><strong>{{ "def configurada" if health.llm_def_configured else "def ausente" }}</strong></div>
-        <div><span>Provider</span><strong>{{ health.llm_config_style }}</strong></div>
+        <div><span>LLM</span><strong>{{ "def configurada" if health.llm_def_configured else "def ausente" }}</strong></div>
+        <div><span>Token Maestro</span><strong>{{ "configurado" if health.maestro_token_set else "ausente" }}</strong></div>
         <div><span>Banco</span><strong>{{ health.db_size_mb }} MB</strong></div>
     </div>
 </div>
@@ -47,14 +47,14 @@
         <div class="panel-header">
             <div>
                 <h2>Diagnóstico técnico</h2>
-                <p>Campos longos são quebrados para evitar estouro de layout em telas menores.</p>
+                <p>Status mínimo do runtime local, sem campos legados de provider/modelo.</p>
             </div>
         </div>
 
         <dl class="health-details">
             <div>
-                <dt>Configuração do modelo</dt>
-                <dd>Toda a configuração fica na def Python em /config.</dd>
+                <dt>Def do LLM</dt>
+                <dd>{{ health.llm_def_chars }} caracteres em /config.</dd>
             </div>
             <div>
                 <dt>Banco SQLite</dt>
