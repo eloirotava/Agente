@@ -25,6 +25,19 @@ def _safe_float(value, default: float, minimum: float = 0.1, maximum: float = 36
     return max(minimum, min(parsed, maximum))
 
 
+def _optional_positive_float(value, maximum: float = 24 * 3600.0) -> float | None:
+    text = str(value if value is not None else "").strip().lower()
+    if text in {"", "0", "none", "null", "false", "off", "sem", "sem timeout"}:
+        return None
+    try:
+        parsed = float(text)
+    except ValueError:
+        return None
+    if parsed <= 0:
+        return None
+    return min(parsed, maximum)
+
+
 def _get_job_semaphore(limit: int) -> asyncio.Semaphore:
     global _JOB_SEMAPHORE, _JOB_SEMAPHORE_LIMIT
     if _JOB_SEMAPHORE is None or _JOB_SEMAPHORE_LIMIT != limit:
@@ -125,17 +138,24 @@ def _avaliar_condicao_sync(t: dict) -> tuple[bool, str]:
     return True, prompt_final
 
 
-async def avaliar_condicao_task(t: dict, timeout_seconds: float) -> tuple[bool, str]:
-    """Executa gatilhos Python fora do event loop para não travar a UI."""
+async def avaliar_condicao_task(
+    t: dict,
+    timeout_seconds: float | None = None,
+) -> tuple[bool, str]:
+    """Executa gatilhos Python fora do event loop para não travar a UI.
+
+    Por padrão não corta processos demorados: eles terminam no background.
+    Timeout só é aplicado se configurado com valor positivo.
+    """
     try:
-        return await asyncio.wait_for(
-            asyncio.to_thread(_avaliar_condicao_sync, t),
-            timeout=timeout_seconds,
-        )
+        evaluation = asyncio.to_thread(_avaliar_condicao_sync, t)
+        if timeout_seconds is None:
+            return await evaluation
+        return await asyncio.wait_for(evaluation, timeout=timeout_seconds)
     except asyncio.TimeoutError:
         print(
             f"Gatilho Python '{t['title']}' excedeu {timeout_seconds:.1f}s; "
-            "pulando disparo para preservar a interface.",
+            "pulando disparo por timeout configurado.",
             flush=True,
         )
     except Exception as e:
@@ -147,11 +167,13 @@ async def disparar_maestro_api(titulo: str, prompt: str, cfg: dict | None = None
     """Usa a API OpenAI compatível do Maestro local com token obrigatório."""
     cfg = cfg or get_config()
     max_jobs = _safe_int(cfg.get("scheduler_max_concurrent_jobs"), default=1, minimum=1, maximum=20)
-    timeout_seconds = _safe_float(cfg.get("scheduler_maestro_timeout_seconds"), default=300.0, minimum=1.0, maximum=3600.0)
+    timeout_seconds = _optional_positive_float(
+        cfg.get("scheduler_maestro_hard_timeout_seconds")
+    )
     semaphore = _get_job_semaphore(max_jobs)
 
     async with semaphore:
-        url = "http://127.0.0.1:8000/api/maestro"
+        url = "http://127.0.0.1:8081/api/maestro"
         token = (cfg.get("maestro_api_token") or "").strip()
         if not token:
             print("Erro ao chamar API Central do Maestro: token local do Maestro não configurado.")
@@ -173,6 +195,26 @@ async def disparar_maestro_api(titulo: str, prompt: str, cfg: dict | None = None
             print(f"Erro ao chamar API Central do Maestro: {e}", flush=True)
 
 
+async def processar_tarefa_agendada(
+    t: dict,
+    cfg: dict,
+    agora_str: str,
+) -> None:
+    condition_timeout = _optional_positive_float(
+        cfg.get("scheduler_condition_hard_timeout_seconds")
+    )
+    condicao_valida, prompt_final = await avaliar_condicao_task(
+        t,
+        timeout_seconds=condition_timeout,
+    )
+
+    if not condicao_valida:
+        return
+
+    print(f"[{agora_str}] 🚀 Disparando Tarefa: '{t['title']}' via API Central!")
+    await disparar_maestro_api(t["title"], prompt_final, cfg)
+
+
 async def start_periodic_scheduler():
     """Loop infinito do Relógio. Avalia os gatilhos e delega para a API."""
     print("Motor de Agendamento iniciado. (Agora isolando gatilhos pesados do event loop)")
@@ -185,12 +227,6 @@ async def start_periodic_scheduler():
 
         try:
             cfg = get_config()
-            condition_timeout = _safe_float(
-                cfg.get("scheduler_condition_timeout_seconds"),
-                default=10.0,
-                minimum=0.5,
-                maximum=600.0,
-            )
             tarefas = get_all_tasks()
             for t in tarefas:
                 if t["active"] == 1:
@@ -201,17 +237,10 @@ async def start_periodic_scheduler():
                     )
 
                     if deve_executar_tempo:
-                        condicao_valida, prompt_final = await avaliar_condicao_task(
-                            t,
-                            timeout_seconds=condition_timeout,
-                        )
-
-                        # O RELÓGIO APENAS CHAMA A API ASSÍNCRONA!
-                        if condicao_valida:
-                            print(f"[{agora_str}] 🚀 Disparando Tarefa: '{t['title']}' via API Central!")
-                            teve_anomalia = True
-                            job = asyncio.create_task(disparar_maestro_api(t["title"], prompt_final, cfg))
-                            _track_background_job(job)
+                        # O relógio só enfileira. A condição e o Maestro rodam no background.
+                        teve_anomalia = True
+                        job = asyncio.create_task(processar_tarefa_agendada(t, cfg, agora_str))
+                        _track_background_job(job)
 
             # Atualiza o Heartbeat Visual
             backlog = len(JOBS_EM_ANDAMENTO)

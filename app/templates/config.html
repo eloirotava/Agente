@@ -32,12 +32,12 @@
         <input name="maestro_api_token" type="password" autocomplete="off" value="{{ cfg.maestro_api_token }}"/>
         <div class="grid-3">
             <div>
-                <label>Timeout do gatilho Python (s)</label>
-                <input name="scheduler_condition_timeout_seconds" value="{{ cfg.scheduler_condition_timeout_seconds }}"/>
+                <label>Timeout do gatilho Python (s, vazio = sem cortar)</label>
+                <input name="scheduler_condition_hard_timeout_seconds" value="{{ cfg.scheduler_condition_hard_timeout_seconds }}"/>
             </div>
             <div>
-                <label>Timeout da chamada do Maestro (s)</label>
-                <input name="scheduler_maestro_timeout_seconds" value="{{ cfg.scheduler_maestro_timeout_seconds }}"/>
+                <label>Timeout da chamada do Maestro (s, vazio = sem cortar)</label>
+                <input name="scheduler_maestro_hard_timeout_seconds" value="{{ cfg.scheduler_maestro_hard_timeout_seconds }}"/>
             </div>
             <div>
                 <label>Jobs simultâneos da agenda</label>

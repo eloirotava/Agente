@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block page_title %}Agenda{% endblock %}
 {% block content %}
-<div class="alert info">Os gatilhos Python da agenda agora rodam fora do event loop com timeout configurável, evitando que uma rotina pesada congele a navegação.</div>
+<div class="alert info">Os gatilhos Python e chamadas pesadas da agenda rodam em background fora do event loop: podem demorar sem congelar a navegação. Timeout hard só corta se você configurar um valor positivo em /config.</div>
 <div class="grid-2">
     <form method="post" action="/tasks" class="panel">
         <div class="panel-header">
@@ -21,7 +21,7 @@
         <label>Janela de execução <span class="field-hint">Use horários fixos ou intervalo em minutos.</span></label>
         <input type="text" name="schedule_hours" value="{{ edit_task.schedule_hours if edit_task else '' }}" required placeholder="Ex: 08:00, 16:00 ou */5m">
 
-        <label>Gatilho de condição <span class="field-hint">Opcional. Defina uma função avaliar(). Retorne False para não disparar. Scripts pesados são executados em thread separada e respeitam scheduler_condition_timeout_seconds.</span></label>
+        <label>Gatilho de condição <span class="field-hint">Opcional. Defina uma função avaliar(). Retorne False para não disparar. Scripts pesados são executados em thread separada; por padrão não são cortados, apenas deixam a navegação livre.</span></label>
         <textarea name="condition_script" rows="7" class="code" placeholder="def avaliar():&#10;    return False">{{ edit_task.condition_script if edit_task else '' }}</textarea>
 
         <label>Comando para o Maestro</label>

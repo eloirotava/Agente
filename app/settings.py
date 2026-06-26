@@ -18,7 +18,7 @@ async def gerar_resposta(messages, cfg):
 DEFAULTS = {
     "maestro_api_token": MAESTRO_API_TOKEN,
     "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
-    "scheduler_condition_timeout_seconds": "10",
-    "scheduler_maestro_timeout_seconds": "300",
+    "scheduler_condition_hard_timeout_seconds": "",
+    "scheduler_maestro_hard_timeout_seconds": "",
     "scheduler_max_concurrent_jobs": "1"
 }
