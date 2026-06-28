@@ -1,5 +1,5 @@
 import asyncio
-import httpx
+import inspect
 from datetime import datetime
 from app.db import get_all_tasks, get_config, get_conn
 
@@ -194,18 +194,18 @@ async def despachar_evento_agenda(
     cfg: dict,
     agora_str: str,
 ) -> None:
+    dispatch_code = (cfg.get("scheduler_dispatch_code") or "").strip()
+    if dispatch_code:
+        payload = _montar_payload_agenda(titulo, prompt, agora_str)
+        await _executar_dispatch_agenda_customizado(dispatch_code, payload, cfg)
+        return
+
     hook_slug = (cfg.get("scheduler_default_hook_slug") or "").strip()
     if not hook_slug:
         await disparar_maestro_local(titulo, prompt, cfg)
         return
 
-    payload = {
-        "tipo": "agenda",
-        "origem": f"AGENDA: {titulo}",
-        "titulo": titulo,
-        "prompt": prompt,
-        "horario_scan": agora_str,
-    }
+    payload = _montar_payload_agenda(titulo, prompt, agora_str)
 
     try:
         from app.routers.hooks import dispatch_hook
@@ -220,6 +220,58 @@ async def despachar_evento_agenda(
             f"Erro ao despachar agenda para hook '{hook_slug}': {exc}",
             flush=True,
         )
+
+
+def _montar_payload_agenda(titulo: str, prompt: str, agora_str: str) -> dict:
+    return {
+        "tipo": "agenda",
+        "origem": f"AGENDA: {titulo}",
+        "titulo": titulo,
+        "prompt": prompt,
+        "horario_scan": agora_str,
+    }
+
+
+async def _executar_dispatch_agenda_customizado(
+    dispatch_code: str,
+    evento: dict,
+    cfg: dict,
+) -> None:
+    async def chamar_maestro(mensagem: str | None = None, origem: str | None = None):
+        from app.routers.maestro import processar_orquestracao
+
+        return await processar_orquestracao(
+            mensagem=mensagem or evento.get("prompt", ""),
+            origem=origem or evento.get("origem", "AGENDA"),
+        )
+
+    async def chamar_hook(slug: str, payload: dict | None = None, headers: dict | None = None):
+        from app.routers.hooks import dispatch_hook
+
+        return await dispatch_hook(
+            slug,
+            payload or evento,
+            headers or {"x-agente-origem": "agenda"},
+        )
+
+    scope = {"asyncio": asyncio}
+    helpers = {
+        "processar_orquestracao": chamar_maestro,
+        "dispatch_hook": chamar_hook,
+        "disparar_maestro_local": lambda titulo, prompt: disparar_maestro_local(titulo, prompt, cfg),
+    }
+
+    try:
+        exec(dispatch_code, scope, scope)
+        func = scope.get("despachar_agenda") or scope.get("despachar") or scope.get("executar")
+        if not callable(func):
+            raise RuntimeError("Def customizada sem despachar_agenda(evento, cfg, helpers).")
+
+        resultado = func(evento, cfg, helpers)
+        if inspect.isawaitable(resultado):
+            await resultado
+    except Exception as exc:
+        print(f"Erro no dispatch customizado da agenda: {exc}", flush=True)
 
 
 async def processar_tarefa_agendada(

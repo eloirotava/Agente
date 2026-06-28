@@ -28,6 +28,8 @@ def config_post(
     scheduler_maestro_hard_timeout_seconds: str = Form(""),
     scheduler_max_concurrent_jobs: str = Form("1"),
     scheduler_default_hook_slug: str = Form(""),
+    scheduler_dispatch_code: str = Form(""),
+    maestro_core_code: str = Form(""),
     change_note: str = Form("")
 ):
     save_config({
@@ -35,7 +37,9 @@ def config_post(
         "scheduler_condition_hard_timeout_seconds": scheduler_condition_hard_timeout_seconds,
         "scheduler_maestro_hard_timeout_seconds": scheduler_maestro_hard_timeout_seconds,
         "scheduler_max_concurrent_jobs": scheduler_max_concurrent_jobs,
-        "scheduler_default_hook_slug": scheduler_default_hook_slug
+        "scheduler_default_hook_slug": scheduler_default_hook_slug,
+        "scheduler_dispatch_code": scheduler_dispatch_code,
+        "maestro_core_code": maestro_core_code
     }, change_note=change_note)
     return templates.TemplateResponse(
         request=request,

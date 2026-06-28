@@ -1,5 +1,6 @@
 import json
 import asyncio
+import inspect
 import traceback  # Rastreio completo de erros
 from typing import Any, List, Tuple
 
@@ -146,8 +147,74 @@ async def _executar_comandos_maestro(comandos_lista: List[dict]) -> Tuple[str, L
     logs_exec.append(f"EXECUÇÃO DE ENDPOINTS ({len(comandos_lista)} comandos):\n{texto_devolucao}")
     return texto_devolucao, logs_exec
 
+
+def _normalizar_retorno_core_customizado(resultado: Any) -> tuple[str, List[str]]:
+    if isinstance(resultado, dict):
+        resposta = str(resultado.get("resposta_final") or resultado.get("resposta") or "")
+        logs = resultado.get("logs") or resultado.get("log") or []
+        if isinstance(logs, str):
+            logs = [logs]
+        return resposta, [str(item) for item in logs]
+
+    return str(resultado or ""), ["Core customizado retornou texto simples."]
+
+
+async def _processar_core_customizado(
+    core_code: str,
+    mensagem: str,
+    origem: str,
+    cfg: dict,
+) -> dict:
+    helpers = {
+        "call_llm_messages": call_llm_messages,
+        "config_fingerprint": config_fingerprint,
+        "get_context": get_context,
+        "get_general_contexts": get_general_contexts,
+        "get_tool": get_tool,
+        "get_all_tools": get_all_tools,
+        "executar_comandos": _executar_comandos_maestro,
+        "limpar_json": _limpar_resposta_modelo_para_json,
+        "parse_json_sequence": _parse_json_sequence,
+        "truncate": _truncate,
+    }
+    scope = {"asyncio": asyncio, "json": json}
+    logs: List[str] = [
+        f"[ORIGEM: {origem}]",
+        "MAESTRO CORE: executando def customizada de configuração.",
+    ]
+
+    try:
+        exec(core_code, scope, scope)
+        func = scope.get("processar") or scope.get("executar")
+        if not callable(func):
+            raise RuntimeError("Def customizada sem processar(mensagem, origem, cfg, helpers).")
+
+        resultado = func(mensagem, origem, cfg, helpers)
+        if inspect.isawaitable(resultado):
+            resultado = await resultado
+
+        resposta_final, logs_customizados = _normalizar_retorno_core_customizado(resultado)
+        logs.extend(logs_customizados)
+        if not resposta_final:
+            resposta_final = "Core customizado executado sem resposta final."
+            logs.append("AVISO: core customizado não retornou resposta_final.")
+    except Exception:
+        resposta_final = "Erro no core customizado do Maestro. Verifique o Log de Raciocínio."
+        logs.append(f"ERRO NO CORE CUSTOMIZADO:\n{traceback.format_exc()}")
+
+    log_interaction(
+        mensagem if origem == "Chat" else f"[{origem}] {mensagem}",
+        "\n".join(logs),
+        resposta_final,
+    )
+    return {"resposta_final": resposta_final, "logs": logs}
+
 async def processar_orquestracao(mensagem: str, origem: str):
     cfg = get_config()
+    core_code = (cfg.get("maestro_core_code") or "").strip()
+    if core_code:
+        return await _processar_core_customizado(core_code, mensagem, origem, cfg)
+
     ctx_base = get_context("system_prompt")
     system_prompt = ctx_base["content"] if ctx_base else "Você é um assistente."
 

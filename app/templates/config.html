@@ -49,6 +49,19 @@
         <div class="alert info" style="margin-top: 12px;">
             Fluxo recomendado para core mínimo: Agenda → Hook default → Maestro. O hook recebe JSON com tipo, origem, título, prompt e horário do scan.
         </div>
+
+        <details style="margin-top: 14px;">
+            <summary><strong>Core avançado em Python</strong></summary>
+            <div class="alert info" style="margin-top: 12px;">
+                Opcional. Deixe vazio para usar o core interno. Use apenas para substituir o comportamento da agenda ou do Maestro sem editar arquivos físicos.
+            </div>
+            <label>Dispatch da agenda <span class="field-hint">Opcional. Defina async/sync despachar_agenda(evento, cfg, helpers). Se preenchido, substitui o despacho padrão da agenda.</span></label>
+            <textarea name="scheduler_dispatch_code" rows="10" class="code" placeholder="async def despachar_agenda(evento, cfg, helpers):&#10;    await helpers['processar_orquestracao'](mensagem=evento['prompt'], origem=evento['origem'])">{{ cfg.scheduler_dispatch_code }}</textarea>
+
+            <label>Core do Maestro <span class="field-hint">Opcional. Defina async/sync processar(mensagem, origem, cfg, helpers) e retorne {'resposta_final': ..., 'logs': [...]}.</span></label>
+            <textarea name="maestro_core_code" rows="12" class="code" placeholder="async def processar(mensagem, origem, cfg, helpers):&#10;    return {'resposta_final': 'ok', 'logs': ['custom']}">{{ cfg.maestro_core_code }}</textarea>
+        </details>
+
     </div>
     <div class="btn-row"><button type="submit">Salvar configurações</button></div>
 </form>

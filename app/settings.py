@@ -18,5 +18,7 @@ DEFAULTS = {
     "scheduler_condition_hard_timeout_seconds": "",
     "scheduler_maestro_hard_timeout_seconds": "",
     "scheduler_max_concurrent_jobs": "1",
-    "scheduler_default_hook_slug": ""
+    "scheduler_default_hook_slug": "",
+    "scheduler_dispatch_code": "",
+    "maestro_core_code": ""
 }
