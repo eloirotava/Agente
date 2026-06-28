@@ -4,7 +4,7 @@
 {% set is_base = endpoint_atual and endpoint_atual.slug == 'system_prompt' %}
 {% set is_python = endpoint_kind == 'tool' %}
 {% if saved %}<div class="alert success">Endpoint salvo e versionado.</div>{% endif %}
-{% if restored %}<div class="alert success">Versão restaurada como nova versão ativa.</div>{% endif %}
+{% if restored %}<div class="alert success">Versão restaurada sem criar nova versão.</div>{% endif %}
 {% if deleted %}<div class="alert danger">Endpoint removido.</div>{% endif %}
 {% if version_deleted %}<div class="alert danger">Versão removida do histórico.</div>{% endif %}
 {% if protected %}<div class="alert info">O contexto inicial é protegido e não pode ser removido.</div>{% endif %}

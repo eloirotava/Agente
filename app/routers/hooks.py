@@ -10,7 +10,16 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.db import delete_hook, get_all_hooks, get_hook, save_hook
+from app.db import (
+    delete_endpoint_version,
+    delete_hook,
+    get_all_hooks,
+    get_endpoint_version,
+    get_endpoint_versions,
+    get_hook,
+    restore_endpoint_version,
+    save_hook,
+)
 from app.routers.maestro import processar_orquestracao
 
 router = APIRouter()
@@ -162,6 +171,9 @@ def hooks_get(request: Request, hook: str = "", novo: int = 0):
             "hook_selecionado": selected_slug if selected_hook else "",
             "saved": request.query_params.get("saved"),
             "deleted": request.query_params.get("deleted"),
+            "restored": request.query_params.get("restored"),
+            "version_deleted": request.query_params.get("version_deleted"),
+            "versions": get_endpoint_versions("hook", selected_slug) if selected_hook else [],
         },
     )
 
@@ -173,9 +185,10 @@ def hooks_post(
     description: str = Form(""),
     content: str = Form(...),
     active: str = Form("0"),
+    change_note: str = Form(""),
 ):
     safe_slug = _safe_slug(slug)
-    save_hook(safe_slug, title, description, content, 1 if active == "1" else 0)
+    save_hook(safe_slug, title, description, content, 1 if active == "1" else 0, change_note=change_note)
     return RedirectResponse(url=f"/hooks?hook={safe_slug}&saved=1", status_code=303)
 
 
@@ -183,3 +196,20 @@ def hooks_post(
 def hooks_delete(slug: str):
     delete_hook(slug)
     return RedirectResponse(url="/hooks?deleted=1", status_code=303)
+
+
+@router.post("/hooks/versions/restore/{version_id}")
+def hooks_version_restore(version_id: int):
+    version = restore_endpoint_version(version_id)
+    if not version:
+        return RedirectResponse(url="/hooks", status_code=303)
+    return RedirectResponse(url=f"/hooks?hook={version['slug']}&restored=1", status_code=303)
+
+
+@router.post("/hooks/versions/delete/{version_id}")
+def hooks_version_delete(version_id: int):
+    version = get_endpoint_version(version_id)
+    delete_endpoint_version(version_id)
+    if version:
+        return RedirectResponse(url=f"/hooks?hook={version['slug']}&version_deleted=1", status_code=303)
+    return RedirectResponse(url="/hooks?version_deleted=1", status_code=303)

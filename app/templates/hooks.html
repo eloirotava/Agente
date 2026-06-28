@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block page_title %}Hooks{% endblock %}
 {% block content %}
-{% if saved %}<div class="alert success">Hook salvo com sucesso.</div>{% endif %}
+{% if saved %}<div class="alert success">Hook salvo e versionado.</div>{% endif %}
+{% if restored %}<div class="alert success">Versão restaurada sem criar nova versão.</div>{% endif %}
+{% if version_deleted %}<div class="alert danger">Versão removida do histórico.</div>{% endif %}
 {% if deleted %}<div class="alert danger">Hook removido.</div>{% endif %}
 
 <div class="grid-2">
@@ -88,6 +90,9 @@
             <label>Nome corporativo</label>
             <input type="text" name="title" value="{{ hook_atual.title if hook_atual else '' }}" required placeholder="Ex: Entrada Discord Operação">
 
+            <label>Nota da versão <span class="field-hint">Opcional. Ajuda a comparar mudanças no histórico.</span></label>
+            <input name="change_note" placeholder="Ex: ajustei validação do payload">
+
             <label>Descrição</label>
             <textarea name="description" rows="3" placeholder="Explique a origem esperada, formato do payload e objetivo operacional. Este texto será enviado como contexto ao Maestro.">{{ hook_atual.description if hook_atual else '' }}</textarea>
 
@@ -108,6 +113,24 @@
             </form>
             {% endif %}
         </div>
+
+        {% if hook_atual %}
+        <section class="panel">
+            <div class="panel-header"><div><h2>Histórico do hook</h2><p>Restaure versões antigas sem criar uma versão nova automaticamente.</p></div><span class="badge">{{ versions|length }} versões</span></div>
+            {% if not versions %}<div class="alert info">Nenhuma versão registrada ainda.</div>{% endif %}
+            {% for v in versions %}
+            <div class="record-card">
+                <h3>v{{ v.version_number }} · {{ v.created_at }}</h3>
+                <p>{{ v.change_note or 'Sem nota.' }}</p>
+                <div class="btn-row">
+                    <form method="post" action="/hooks/versions/restore/{{ v.id }}"><button type="submit">Restaurar</button></form>
+                    <form method="post" action="/hooks/versions/delete/{{ v.id }}" onsubmit="return confirm('Excluir esta versão?');"><button type="submit" class="danger-btn">Apagar versão</button></form>
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

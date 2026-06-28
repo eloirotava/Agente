@@ -243,15 +243,24 @@ def get_task(task_id: int):
         row = cur.fetchone()
         return dict(row) if row else None
 
-def save_task(title: str, prompt: str, schedule_hours: str, condition_script: str):
+def save_task(title: str, prompt: str, schedule_hours: str, condition_script: str, change_note: str = ""):
     with get_conn() as c:
         c.execute("""
         INSERT INTO bot_tasks (title, prompt, schedule_hours, condition_script)
         VALUES (?, ?, ?, ?)
         """, (title, prompt, schedule_hours, condition_script))
+        task_id = c.execute("SELECT last_insert_rowid()").fetchone()[0]
         c.commit()
+    record_endpoint_version("task", str(task_id), {
+        "title": title,
+        "description_for_ai": "1",
+        "tool_context": schedule_hours,
+        "content": prompt,
+        "bootstrap_json": condition_script,
+    }, change_note or "Rotina criada")
 
-def update_task(task_id: int, title: str, prompt: str, schedule_hours: str, condition_script: str):
+def update_task(task_id: int, title: str, prompt: str, schedule_hours: str, condition_script: str, change_note: str = ""):
+    old = get_task(task_id)
     with get_conn() as c:
         c.execute("""
         UPDATE bot_tasks
@@ -259,6 +268,15 @@ def update_task(task_id: int, title: str, prompt: str, schedule_hours: str, cond
         WHERE id = ?
         """, (title, prompt, schedule_hours, condition_script, task_id))
         c.commit()
+    data = {
+        "title": title,
+        "description_for_ai": str(old.get("active", 1) if old else 1),
+        "tool_context": schedule_hours,
+        "content": prompt,
+        "bootstrap_json": condition_script,
+    }
+    if not old or any(str(old.get({"tool_context":"schedule_hours", "content":"prompt", "bootstrap_json":"condition_script", "description_for_ai":"active"}.get(k, k)) or "") != str(data.get(k) or "") for k in data):
+        record_endpoint_version("task", str(task_id), data, change_note or "Rotina atualizada")
 
 def delete_task(task_id: int):
     with get_conn() as c:
@@ -277,7 +295,8 @@ def get_all_hooks():
         cur = c.execute("SELECT * FROM bot_hooks ORDER BY title COLLATE NOCASE")
         return [dict(r) for r in cur.fetchall()]
 
-def save_hook(slug: str, title: str, description: str, content: str, active: int = 1):
+def save_hook(slug: str, title: str, description: str, content: str, active: int = 1, change_note: str = ""):
+    old = get_hook(slug)
     with get_conn() as c:
         c.execute("""
         INSERT INTO bot_hooks (slug, title, description, content, active, updated_at)
@@ -290,6 +309,15 @@ def save_hook(slug: str, title: str, description: str, content: str, active: int
             updated_at=CURRENT_TIMESTAMP
         """, (slug, title, description, content, active))
         c.commit()
+    data = {
+        "title": title,
+        "description_for_ai": description,
+        "tool_context": str(active),
+        "content": content,
+    }
+    hook_key_map = {"description_for_ai": "description", "tool_context": "active"}
+    if not old or any(str(old.get(hook_key_map.get(k, k)) or "") != str(data.get(k) or "") for k in data):
+        record_endpoint_version("hook", slug, data, change_note or "Hook salvo")
 
 def delete_hook(slug: str):
     with get_conn() as c:
@@ -358,24 +386,95 @@ def restore_endpoint_version(version_id: int):
     version = get_endpoint_version(version_id)
     if not version:
         return None
-    if version["endpoint_kind"] == "context":
-        save_context(
-            version["slug"],
-            version["title"],
-            version["description_for_ai"],
-            version["content"],
-            version["bootstrap_json"],
-            change_note=f"Restaurado da v{version['version_number']}",
-        )
-    else:
-        save_tool(
-            version["slug"],
-            version["title"],
-            version["description_for_ai"],
-            version["tool_context"],
-            version["content"],
-            change_note=f"Restaurado da v{version['version_number']}",
-        )
+
+    kind = version["endpoint_kind"]
+    slug = version["slug"]
+
+    with get_conn() as c:
+        if kind == "context":
+            c.execute(
+                """
+                INSERT INTO bot_contexts (slug, title, description_for_ai, content, bootstrap_json)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(slug) DO UPDATE SET
+                    title=excluded.title,
+                    description_for_ai=excluded.description_for_ai,
+                    content=excluded.content,
+                    bootstrap_json=excluded.bootstrap_json
+                """,
+                (
+                    slug,
+                    version["title"],
+                    version["description_for_ai"],
+                    version["content"],
+                    version["bootstrap_json"],
+                ),
+            )
+        elif kind == "tool":
+            c.execute(
+                """
+                INSERT INTO bot_tools (slug, title, description_for_ai, tool_context, content)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(slug) DO UPDATE SET
+                    title=excluded.title,
+                    description_for_ai=excluded.description_for_ai,
+                    tool_context=excluded.tool_context,
+                    content=excluded.content
+                """,
+                (
+                    slug,
+                    version["title"],
+                    version["description_for_ai"],
+                    version["tool_context"],
+                    version["content"],
+                ),
+            )
+        elif kind == "hook":
+            c.execute(
+                """
+                INSERT INTO bot_hooks (slug, title, description, content, active, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(slug) DO UPDATE SET
+                    title=excluded.title,
+                    description=excluded.description,
+                    content=excluded.content,
+                    active=excluded.active,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    slug,
+                    version["title"],
+                    version["description_for_ai"],
+                    version["content"],
+                    int(version["tool_context"] or 1),
+                ),
+            )
+        elif kind == "task":
+            task_id = int(slug)
+            c.execute(
+                """
+                INSERT INTO bot_tasks (id, title, prompt, schedule_hours, active, condition_script)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title=excluded.title,
+                    prompt=excluded.prompt,
+                    schedule_hours=excluded.schedule_hours,
+                    active=excluded.active,
+                    condition_script=excluded.condition_script
+                """,
+                (
+                    task_id,
+                    version["title"],
+                    version["content"],
+                    version["tool_context"],
+                    int(version["description_for_ai"] or 1),
+                    version["bootstrap_json"],
+                ),
+            )
+        else:
+            return None
+        c.commit()
+
     return version
 
 
