@@ -44,8 +44,11 @@
                 <input name="scheduler_max_concurrent_jobs" value="{{ cfg.scheduler_max_concurrent_jobs }}"/>
             </div>
         </div>
-        <label>Hook default da agenda <span class="field-hint">Opcional. Se preenchido, a agenda envia eventos para este hook em vez de chamar o Maestro diretamente.</span></label>
-        <input name="scheduler_default_hook_slug" value="{{ cfg.scheduler_default_hook_slug }}" placeholder="ex: entrada_chamados"/>
+        <label>Hook default da agenda <span class="field-hint">Opcional. Informe somente o slug de um hook ativo. Ex: entrada_agenda. Se vazio, a agenda chama o Maestro direto.</span></label>
+        <input name="scheduler_default_hook_slug" value="{{ cfg.scheduler_default_hook_slug }}" placeholder="ex: entrada_agenda"/>
+        <div class="alert info" style="margin-top: 12px;">
+            Fluxo recomendado para core mínimo: Agenda → Hook default → Maestro. O hook recebe JSON com tipo, origem, título, prompt e horário do scan.
+        </div>
     </div>
     <div class="btn-row"><button type="submit">Salvar configurações</button></div>
 </form>

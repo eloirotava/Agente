@@ -34,6 +34,36 @@
             Autenticação, validação de token e regras específicas ficam dentro do próprio Python do hook. A descrição cadastrada também é enviada como contexto ao Maestro.
         </div>
 
+        <details style="margin-top: 18px;">
+            <summary><strong>Exemplo: hook default para a agenda</strong></summary>
+            <p>Crie um hook ativo com slug <code>entrada_agenda</code> e coloque esse mesmo slug em <strong>Configurações → Hook default da agenda</strong>.</p>
+            <pre>def receber(payload: dict, headers: dict):
+    return {
+        "origem": payload.get("origem", "AGENDA"),
+        "mensagem": payload.get("prompt", ""),
+        "contexto": {
+            "tipo": payload.get("tipo"),
+            "titulo": payload.get("titulo"),
+            "horario_scan": payload.get("horario_scan"),
+            "payload_bruto": payload,
+        },
+    }</pre>
+        </details>
+
+        <details style="margin-top: 12px;">
+            <summary><strong>Chamada padrão OpenAI-compatible</strong></summary>
+            <p>Para chamar o Maestro sem hook, use <code>/api/maestro</code> com formato de chat completions.</p>
+            <pre>curl -s -X POST http://127.0.0.1:8081/api/maestro \
+  -H 'Authorization: Bearer SEU_TOKEN_LOCAL_DO_MAESTRO' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model":"botmig-maestro",
+    "origem":"cliente-openai",
+    "messages":[{"role":"user","content":"oi"}]
+  }'</pre>
+        </details>
+
+
         {% if hook_atual %}
         <h3>Teste local</h3>
         <pre>curl -s -X POST http://127.0.0.1:8081/hook/{{ hook_atual.slug }} \
