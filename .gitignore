@@ -20,3 +20,6 @@ dados/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# Local Telegram polling cursor/state
+telegram_poll_state.json
