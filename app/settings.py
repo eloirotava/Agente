@@ -20,5 +20,6 @@ DEFAULTS = {
     "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
     "scheduler_condition_hard_timeout_seconds": "",
     "scheduler_maestro_hard_timeout_seconds": "",
-    "scheduler_max_concurrent_jobs": "1"
+    "scheduler_max_concurrent_jobs": "1",
+    "scheduler_default_hook_slug": ""
 }

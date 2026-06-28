@@ -36,7 +36,7 @@
 
         {% if hook_atual %}
         <h3>Teste local</h3>
-        <pre>curl -s -X POST http://127.0.0.1:8000/hook/{{ hook_atual.slug }} \
+        <pre>curl -s -X POST http://127.0.0.1:8081/hook/{{ hook_atual.slug }} \
   -H 'Content-Type: application/json' \
   -d '{"texto":"ping local","origem":"curl"}'</pre>
         {% endif %}

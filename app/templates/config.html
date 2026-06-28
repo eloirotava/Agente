@@ -44,6 +44,8 @@
                 <input name="scheduler_max_concurrent_jobs" value="{{ cfg.scheduler_max_concurrent_jobs }}"/>
             </div>
         </div>
+        <label>Hook default da agenda <span class="field-hint">Opcional. Se preenchido, a agenda envia eventos para este hook em vez de chamar o Maestro diretamente.</span></label>
+        <input name="scheduler_default_hook_slug" value="{{ cfg.scheduler_default_hook_slug }}" placeholder="ex: entrada_chamados"/>
     </div>
     <div class="btn-row"><button type="submit">Salvar configurações</button></div>
 </form>

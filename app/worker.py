@@ -195,6 +195,40 @@ async def disparar_maestro_api(titulo: str, prompt: str, cfg: dict | None = None
             print(f"Erro ao chamar API Central do Maestro: {e}", flush=True)
 
 
+async def despachar_evento_agenda(
+    titulo: str,
+    prompt: str,
+    cfg: dict,
+    agora_str: str,
+) -> None:
+    hook_slug = (cfg.get("scheduler_default_hook_slug") or "").strip()
+    if not hook_slug:
+        await disparar_maestro_api(titulo, prompt, cfg)
+        return
+
+    payload = {
+        "tipo": "agenda",
+        "origem": f"AGENDA: {titulo}",
+        "titulo": titulo,
+        "prompt": prompt,
+        "horario_scan": agora_str,
+    }
+
+    try:
+        from app.routers.hooks import dispatch_hook
+
+        await dispatch_hook(
+            hook_slug,
+            payload,
+            {"x-agente-origem": "agenda"},
+        )
+    except Exception as exc:
+        print(
+            f"Erro ao despachar agenda para hook '{hook_slug}': {exc}",
+            flush=True,
+        )
+
+
 async def processar_tarefa_agendada(
     t: dict,
     cfg: dict,
@@ -211,8 +245,9 @@ async def processar_tarefa_agendada(
     if not condicao_valida:
         return
 
-    print(f"[{agora_str}] 🚀 Disparando Tarefa: '{t['title']}' via API Central!")
-    await disparar_maestro_api(t["title"], prompt_final, cfg)
+    destino = (cfg.get("scheduler_default_hook_slug") or "Maestro direto").strip()
+    print(f"[{agora_str}] 🚀 Disparando Tarefa: '{t['title']}' via {destino}!")
+    await despachar_evento_agenda(t["title"], prompt_final, cfg, agora_str)
 
 
 async def start_periodic_scheduler():

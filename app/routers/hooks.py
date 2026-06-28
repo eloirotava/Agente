@@ -96,7 +96,7 @@ async def dispatch_hook(slug: str, payload: dict[str, Any], headers: dict[str, s
 
     local_scope: dict[str, Any] = {}
     try:
-        exec(code, {}, local_scope)
+        exec(code, local_scope, local_scope)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Erro ao carregar script do hook: {exc}") from exc
 
