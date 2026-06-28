@@ -200,26 +200,10 @@ async def despachar_evento_agenda(
         await _executar_dispatch_agenda_customizado(dispatch_code, payload, cfg)
         return
 
-    hook_slug = (cfg.get("scheduler_default_hook_slug") or "").strip()
-    if not hook_slug:
-        await disparar_maestro_local(titulo, prompt, cfg)
-        return
-
-    payload = _montar_payload_agenda(titulo, prompt, agora_str)
-
-    try:
-        from app.routers.hooks import dispatch_hook
-
-        await dispatch_hook(
-            hook_slug,
-            payload,
-            {"x-agente-origem": "agenda"},
-        )
-    except Exception as exc:
-        print(
-            f"Erro ao despachar agenda para hook '{hook_slug}': {exc}",
-            flush=True,
-        )
+    print(
+        f"Agenda '{titulo}' ignorada: scheduler_dispatch_code não configurado.",
+        flush=True,
+    )
 
 
 def _montar_payload_agenda(titulo: str, prompt: str, agora_str: str) -> dict:
@@ -254,20 +238,47 @@ async def _executar_dispatch_agenda_customizado(
             headers or {"x-agente-origem": "agenda"},
         )
 
-    scope = {"asyncio": asyncio}
+    scope = {
+        "asyncio": asyncio,
+        "get_config": get_config,
+        "disparar_maestro_local": disparar_maestro_local,
+    }
     helpers = {
         "processar_orquestracao": chamar_maestro,
         "dispatch_hook": chamar_hook,
         "disparar_maestro_local": lambda titulo, prompt: disparar_maestro_local(titulo, prompt, cfg),
+        "montar_payload_agenda": _montar_payload_agenda,
     }
 
     try:
         exec(dispatch_code, scope, scope)
-        func = scope.get("despachar_agenda") or scope.get("despachar") or scope.get("executar")
+        func = (
+            scope.get("despachar_agenda")
+            or scope.get("despachar_evento_agenda")
+            or scope.get("despachar")
+            or scope.get("executar")
+        )
         if not callable(func):
-            raise RuntimeError("Def customizada sem despachar_agenda(evento, cfg, helpers).")
+            raise RuntimeError(
+                "Def customizada sem função de entrada. Use despachar_agenda(evento, cfg, helpers), "
+                "despachar_evento_agenda(titulo, prompt, cfg, agora_str) ou executar(...)."
+            )
 
-        resultado = func(evento, cfg, helpers)
+        assinatura = inspect.signature(func)
+        parametros = assinatura.parameters
+        if "evento" in parametros:
+            resultado = func(evento, cfg, helpers)
+        elif len(parametros) >= 4:
+            resultado = func(
+                evento.get("titulo", ""),
+                evento.get("prompt", ""),
+                cfg,
+                evento.get("horario_scan", ""),
+            )
+        elif len(parametros) == 3:
+            resultado = func(evento, cfg, helpers)
+        else:
+            resultado = func(evento)
         if inspect.isawaitable(resultado):
             await resultado
     except Exception as exc:

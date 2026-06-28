@@ -44,22 +44,22 @@
                 <input name="scheduler_max_concurrent_jobs" value="{{ cfg.scheduler_max_concurrent_jobs }}"/>
             </div>
         </div>
-        <label>Hook default da agenda <span class="field-hint">Opcional. Informe somente o slug de um hook ativo. Ex: entrada_agenda. Se vazio, a agenda chama o Maestro direto.</span></label>
+        <label>Hook default da agenda <span class="field-hint">Opcional. Valor disponível em cfg para o seu dispatch customizado. O core interno não chama mais hook/Maestro automaticamente.</span></label>
         <input name="scheduler_default_hook_slug" value="{{ cfg.scheduler_default_hook_slug }}" placeholder="ex: entrada_agenda"/>
         <div class="alert info" style="margin-top: 12px;">
-            Fluxo recomendado para core mínimo: Agenda → Hook default → Maestro. O hook recebe JSON com tipo, origem, título, prompt e horário do scan.
+            Fluxo mínimo agora é configurado: cole uma def em "Dispatch da agenda" e outra em "Core do Maestro". Se uma delas ficar vazia, o agente registra o problema em vez de usar um core padrão escondido.
         </div>
 
         <details style="margin-top: 14px;">
             <summary><strong>Core avançado em Python</strong></summary>
             <div class="alert info" style="margin-top: 12px;">
-                Opcional. Deixe vazio para usar o core interno. Use apenas para substituir o comportamento da agenda ou do Maestro sem editar arquivos físicos.
+                Cole aqui os cores em Python. Não há Maestro/agenda padrão escondidos: se ficar vazio, o agente não executa aquele fluxo.
             </div>
-            <label>Dispatch da agenda <span class="field-hint">Opcional. Defina async/sync despachar_agenda(evento, cfg, helpers). Se preenchido, substitui o despacho padrão da agenda.</span></label>
+            <label>Dispatch da agenda <span class="field-hint">Defina async/sync despachar_agenda(evento, cfg, helpers). Também aceita despachar_evento_agenda(titulo, prompt, cfg, agora_str) para facilitar colar código antigo.</span></label>
             <textarea name="scheduler_dispatch_code" rows="10" class="code" placeholder="async def despachar_agenda(evento, cfg, helpers):&#10;    await helpers['processar_orquestracao'](mensagem=evento['prompt'], origem=evento['origem'])">{{ cfg.scheduler_dispatch_code }}</textarea>
 
-            <label>Core do Maestro <span class="field-hint">Opcional. Defina async/sync processar(mensagem, origem, cfg, helpers) e retorne {'resposta_final': ..., 'logs': [...]}.</span></label>
-            <textarea name="maestro_core_code" rows="12" class="code" placeholder="async def processar(mensagem, origem, cfg, helpers):&#10;    return {'resposta_final': 'ok', 'logs': ['custom']}">{{ cfg.maestro_core_code }}</textarea>
+            <label>Core do Maestro <span class="field-hint">Defina async/sync processar(mensagem, origem, cfg, helpers). Também aceita processar_orquestracao(mensagem, origem).</span></label>
+            <textarea name="maestro_core_code" rows="12" class="code" placeholder="async def processar(mensagem, origem, cfg, helpers):&#10;    return {'resposta_final': 'ok', 'logs': ['custom']}&#10;&#10;# ou: async def processar_orquestracao(mensagem, origem): ...">{{ cfg.maestro_core_code }}</textarea>
         </details>
 
     </div>
