@@ -46,7 +46,6 @@ def get_health_snapshot():
     return {
         "llm_def_configured": bool(llm_provider_code),
         "llm_def_chars": len(llm_provider_code),
-        "maestro_token_set": bool((cfg.get("maestro_api_token") or "").strip()),
         "db_path": str(DB_PATH),
         "db_size_mb": db_size_mb,
         "total_docs": total_docs,

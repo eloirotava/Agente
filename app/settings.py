@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY", "").strip()
-MAESTRO_API_TOKEN = os.getenv("MAESTRO_API_TOKEN", "").strip()
-
 DEFAULT_LLM_PROVIDER_CODE = '''# Configure TODO o acesso ao modelo dentro desta def.
 # Exemplo: importe httpx aqui ou dentro da função, defina URL/modelo/token,
 # envie `messages` ao backend e retorne o texto da resposta.
@@ -16,7 +14,6 @@ async def gerar_resposta(messages, cfg):
 '''
 
 DEFAULTS = {
-    "maestro_api_token": MAESTRO_API_TOKEN,
     "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
     "scheduler_condition_hard_timeout_seconds": "",
     "scheduler_maestro_hard_timeout_seconds": "",

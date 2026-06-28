@@ -9,7 +9,6 @@
     </div>
     <div class="health-status-list">
         <div><span>LLM</span><strong>{{ "def configurada" if health.llm_def_configured else "def ausente" }}</strong></div>
-        <div><span>Token Maestro</span><strong>{{ "configurado" if health.maestro_token_set else "ausente" }}</strong></div>
         <div><span>Banco</span><strong>{{ health.db_size_mb }} MB</strong></div>
     </div>
 </div>

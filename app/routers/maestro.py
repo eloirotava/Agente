@@ -1,11 +1,9 @@
 import json
 import asyncio
-import time
 import traceback  # Rastreio completo de erros
-from typing import Any, List, Tuple, Optional
+from typing import Any, List, Tuple
 
-from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter
 
 from app.db import (
     get_config,
@@ -18,114 +16,9 @@ from app.db import (
 )
 from app.llm_gateway import call_llm_messages, config_fingerprint
 
-router = APIRouter(prefix="/api/maestro")
+router = APIRouter()
 
 MAX_ERROS_FORMATO_CONSECUTIVOS = 3
-
-class OpenAIMessage(BaseModel):
-    role: str
-    content: Any = ""
-
-
-class OpenAIChatRequest(BaseModel):
-    model: str = "botmig-maestro"
-    messages: List[OpenAIMessage]
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    stream: bool = False
-    origem: str = "OpenAI API"
-
-
-def _extract_bearer_token(request: Request) -> str:
-    auth = (request.headers.get("authorization") or "").strip()
-    prefix = "bearer "
-    if auth.lower().startswith(prefix):
-        return auth[len(prefix):].strip()
-    return (request.headers.get("x-maestro-token") or "").strip()
-
-
-def _require_maestro_api_token(request: Request, cfg: dict) -> None:
-    configured_token = (cfg.get("maestro_api_token") or "").strip()
-    if not configured_token:
-        raise HTTPException(
-            status_code=503,
-            detail="Token local do Maestro não configurado. Configure maestro_api_token antes de usar /api/maestro.",
-        )
-
-    received_token = _extract_bearer_token(request)
-    if received_token != configured_token:
-        raise HTTPException(status_code=401, detail="Token local do Maestro inválido ou ausente.")
-
-
-def _content_to_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        partes: List[str] = []
-        for item in content:
-            if isinstance(item, dict):
-                texto = item.get("text") or item.get("content")
-                if isinstance(texto, str):
-                    partes.append(texto)
-            elif isinstance(item, str):
-                partes.append(item)
-        return "\n".join(partes)
-
-    return str(content)
-
-
-def _messages_to_maestro_prompt(messages: List[OpenAIMessage]) -> str:
-    partes: List[str] = []
-    for msg in messages:
-        role = (msg.role or "user").upper()
-        content = _content_to_text(msg.content).strip()
-        if content:
-            partes.append(f"[{role}]\n{content}")
-
-    return "CONVERSA RECEBIDA VIA API OPENAI-COMPATÍVEL:\n\n" + "\n\n".join(partes)
-
-
-
-def _messages_to_maestro_content(messages: List[OpenAIMessage]) -> Any:
-    """Preserva conteúdo multimodal quando a API receber partes OpenAI-style."""
-    has_multimodal = any(not isinstance(msg.content, str) for msg in messages)
-    if not has_multimodal:
-        return _messages_to_maestro_prompt(messages)
-
-    parts: List[Any] = [
-        {
-            "type": "text",
-            "text": "CONVERSA RECEBIDA VIA API OPENAI-COMPATÍVEL MULTIMODAL. Respeite o protocolo JSON do Maestro.",
-        }
-    ]
-    for msg in messages:
-        role = (msg.role or "user").upper()
-        parts.append({"type": "text", "text": f"[{role}]"})
-        if isinstance(msg.content, list):
-            parts.extend(msg.content)
-        else:
-            parts.append({"type": "text", "text": _content_to_text(msg.content)})
-    return parts
-
-def _openai_chat_response(model: str, content: str) -> dict:
-    created = int(time.time())
-    return {
-        "id": f"chatcmpl-botmig-{created}",
-        "object": "chat.completion",
-        "created": created,
-        "model": model or "botmig-maestro",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": content,
-                },
-                "finish_reason": "stop",
-            }
-        ],
-    }
 
 def _parse_json_sequence(text: str) -> Tuple[List[Any], str]:
     decoder = json.JSONDecoder()
@@ -402,15 +295,3 @@ async def processar_orquestracao(mensagem: str, origem: str):
     log_interaction(mensagem if origem == "Chat" else f"[{origem}] {mensagem}", log_str, resposta_final)
 
     return {"resposta_final": resposta_final, "logs": log_raciocinio}
-
-@router.post("")
-async def endpoint_maestro(req: OpenAIChatRequest, request: Request):
-    cfg = get_config()
-    _require_maestro_api_token(request, cfg)
-
-    if req.stream:
-        raise HTTPException(status_code=400, detail="stream=true ainda não é suportado pelo Maestro local.")
-
-    mensagem = _messages_to_maestro_content(req.messages)
-    resultado = await processar_orquestracao(mensagem, req.origem)
-    return _openai_chat_response(req.model, resultado["resposta_final"])

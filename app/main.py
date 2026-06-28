@@ -12,13 +12,12 @@ from app.routers import (
     knowledge,
     logs,
     tasks,
-    maestro,
     hooks,
 )
 from app.worker import start_periodic_scheduler
 
 
-app = FastAPI(title="Agente Rotava - API Centralizada")
+app = FastAPI(title="Agente Rotava - Console Local")
 
 
 # Permite que o HTML hospedado em outro endereço chame a API.
@@ -39,7 +38,6 @@ app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(logs.router)
 app.include_router(tasks.router)
-app.include_router(maestro.router)
 app.include_router(hooks.router)
 
 

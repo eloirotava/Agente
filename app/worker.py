@@ -163,8 +163,8 @@ async def avaliar_condicao_task(
     return False, t["prompt"]
 
 
-async def disparar_maestro_api(titulo: str, prompt: str, cfg: dict | None = None):
-    """Usa a API OpenAI compatível do Maestro local com token obrigatório."""
+async def disparar_maestro_local(titulo: str, prompt: str, cfg: dict | None = None):
+    """Dispara o Maestro internamente, sem API HTTP padrão."""
     cfg = cfg or get_config()
     max_jobs = _safe_int(cfg.get("scheduler_max_concurrent_jobs"), default=1, minimum=1, maximum=20)
     timeout_seconds = _optional_positive_float(
@@ -173,26 +173,19 @@ async def disparar_maestro_api(titulo: str, prompt: str, cfg: dict | None = None
     semaphore = _get_job_semaphore(max_jobs)
 
     async with semaphore:
-        url = "http://127.0.0.1:8081/api/maestro"
-        token = (cfg.get("maestro_api_token") or "").strip()
-        if not token:
-            print("Erro ao chamar API Central do Maestro: token local do Maestro não configurado.")
-            return
-
-        payload = {
-            "model": "botmig-maestro",
-            "origem": f"AGENDA: {titulo}",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ]
-        }
-        headers = {"Authorization": f"Bearer {token}"}
         try:
-            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
+            from app.routers.maestro import processar_orquestracao
+
+            coro = processar_orquestracao(
+                mensagem=prompt,
+                origem=f"AGENDA: {titulo}",
+            )
+            if timeout_seconds is None:
+                await coro
+            else:
+                await asyncio.wait_for(coro, timeout=timeout_seconds)
         except Exception as e:
-            print(f"Erro ao chamar API Central do Maestro: {e}", flush=True)
+            print(f"Erro ao chamar Maestro local: {e}", flush=True)
 
 
 async def despachar_evento_agenda(
@@ -203,7 +196,7 @@ async def despachar_evento_agenda(
 ) -> None:
     hook_slug = (cfg.get("scheduler_default_hook_slug") or "").strip()
     if not hook_slug:
-        await disparar_maestro_api(titulo, prompt, cfg)
+        await disparar_maestro_local(titulo, prompt, cfg)
         return
 
     payload = {

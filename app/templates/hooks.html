@@ -52,19 +52,6 @@
     }</pre>
         </details>
 
-        <details style="margin-top: 12px;">
-            <summary><strong>Chamada padrão OpenAI-compatible</strong></summary>
-            <p>Para chamar o Maestro sem hook, use <code>/api/maestro</code> com formato de chat completions.</p>
-            <pre>curl -s -X POST http://127.0.0.1:8081/api/maestro \
-  -H 'Authorization: Bearer SEU_TOKEN_LOCAL_DO_MAESTRO' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model":"botmig-maestro",
-    "origem":"cliente-openai",
-    "messages":[{"role":"user","content":"oi"}]
-  }'</pre>
-        </details>
-
 
         {% if hook_atual %}
         <h3>Teste local</h3>

@@ -24,7 +24,6 @@ def config_get(request: Request):
 def config_post(
     request: Request,
     llm_provider_code: str = Form(""),
-    maestro_api_token: str = Form(""),
     scheduler_condition_hard_timeout_seconds: str = Form(""),
     scheduler_maestro_hard_timeout_seconds: str = Form(""),
     scheduler_max_concurrent_jobs: str = Form("1"),
@@ -33,7 +32,6 @@ def config_post(
 ):
     save_config({
         "llm_provider_code": llm_provider_code,
-        "maestro_api_token": maestro_api_token,
         "scheduler_condition_hard_timeout_seconds": scheduler_condition_hard_timeout_seconds,
         "scheduler_maestro_hard_timeout_seconds": scheduler_maestro_hard_timeout_seconds,
         "scheduler_max_concurrent_jobs": scheduler_max_concurrent_jobs,
