@@ -62,7 +62,15 @@ def chat_get(request: Request):
     cfg = get_config()
     html = (cfg.get("assistant_html_code") or "").strip()
     if html:
-        return HTMLResponse(_render_assistant_html(html, answer="", error="", logs_json="[]"))
+        return HTMLResponse(
+            _render_assistant_html(
+                html,
+                answer="",
+                error="",
+                logs_json="[]",
+                assistant_payload_json="{}",
+            )
+        )
     return templates.TemplateResponse(request=request, name="chat.html", context={})
 
 @router.post("", response_class=HTMLResponse)
@@ -75,7 +83,13 @@ async def chat_post(request: Request, message: str = Form("")):
             html = (cfg.get("assistant_html_code") or "").strip()
             if html:
                 return HTMLResponse(
-                    _render_assistant_html(html, answer="", error=str(exc), logs_json="[]"),
+                    _render_assistant_html(
+                        html,
+                        answer="",
+                        error=str(exc),
+                        logs_json="[]",
+                        assistant_payload_json="{}",
+                    ),
                     status_code=500,
                 )
             return HTMLResponse(f"Erro no assistente configurado: {exc}", status_code=500)
