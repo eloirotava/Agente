@@ -5,6 +5,11 @@
 {% if request.query_params.get('deleted_version') %}<div class="alert danger">Versão de configuração removida.</div>{% endif %}
 {% if request.query_params.get('restored') %}<div class="alert success">Configuração anterior carregada. Tokens mascarados no histórico não substituem tokens atuais.</div>{% endif %}
 {% if request.query_params.get('restore_missing') %}<div class="alert danger">Versão de configuração não encontrada.</div>{% endif %}
+{% if request.query_params.get('task_saved') %}<div class="alert success">Rotina da agenda salva e versionada.</div>{% endif %}
+{% if request.query_params.get('task_deleted') %}<div class="alert danger">Rotina da agenda removida.</div>{% endif %}
+{% if request.query_params.get('task_restored') %}<div class="alert success">Versão da rotina restaurada.</div>{% endif %}
+{% if request.query_params.get('task_version_deleted') %}<div class="alert danger">Versão da rotina removida.</div>{% endif %}
+{% if request.query_params.get('task_restore_missing') %}<div class="alert danger">Versão da rotina não encontrada.</div>{% endif %}
 
 <form method="post">
     <div class="panel">
@@ -65,6 +70,89 @@
     </div>
     <div class="btn-row"><button type="submit">Salvar configurações</button></div>
 </form>
+
+<section class="panel" id="agenda">
+    <div class="panel-header">
+        <div>
+            <h2>Agenda configurada</h2>
+            <p>Cadastre rotinas aqui mesmo. Use horários fixos (<code>08:00, 16:30</code>) ou intervalos em minutos (<code>*/1m</code>, <code>*/5m</code>).</p>
+        </div>
+        <span class="badge">{{ tasks|length }} rotinas</span>
+    </div>
+    <div class="alert info">
+        O worker continua lendo estas rotinas do banco. O que foi removido foi o arquivo/router físico <code>tasks.py</code>; a gestão da agenda agora fica nesta tela de configuração.
+    </div>
+
+    <div class="grid-2">
+        <form method="post" action="/config/tasks" class="record-card">
+            <h3>{{ 'Editar rotina' if edit_task else 'Nova rotina' }}</h3>
+            {% if edit_task %}<input type="hidden" name="task_id" value="{{ edit_task.id }}">{% endif %}
+
+            <label>Nota da versão <span class="field-hint">Opcional. Ajuda no histórico.</span></label>
+            <input name="change_note" placeholder="Ex: ajustei para rodar a cada minuto">
+
+            <label>Nome da rotina</label>
+            <input type="text" name="title" value="{{ edit_task.title if edit_task else '' }}" required placeholder="Ex: Teste a cada minuto">
+
+            <label>Quando rodar <span class="field-hint">Ex: <code>*/1m</code> para todo minuto, <code>08:00</code> para horário fixo, ou <code>08:00, 16:00</code>.</span></label>
+            <input type="text" name="schedule_hours" value="{{ edit_task.schedule_hours if edit_task else '' }}" required placeholder="*/1m">
+
+            <label>Gatilho Python opcional <span class="field-hint">Defina <code>avaliar()</code>. Retorne False para não disparar; string vira alerta anexado ao prompt.</span></label>
+            <textarea name="condition_script" rows="6" class="code" placeholder="def avaliar():&#10;    return True">{{ edit_task.condition_script if edit_task else '' }}</textarea>
+
+            <label>Prompt enviado ao dispatch da agenda</label>
+            <textarea name="prompt" rows="6" required placeholder="Ex: diga apenas teste de agenda ok">{{ edit_task.prompt if edit_task else '' }}</textarea>
+
+            <div class="btn-row">
+                <button type="submit">{{ 'Salvar rotina' if edit_task else 'Criar rotina' }}</button>
+                {% if edit_task %}<a href="/config#agenda" class="btn secondary-btn">Cancelar edição</a>{% endif %}
+            </div>
+        </form>
+
+        <div>
+            {% if edit_task %}
+            <div class="record-card">
+                <h3>Histórico desta rotina</h3>
+                {% if not task_versions %}<p>Nenhuma versão registrada ainda.</p>{% endif %}
+                {% for v in task_versions %}
+                <details>
+                    <summary>v{{ v.version_number }} · {{ v.created_at }} · {{ v.change_note or 'sem nota' }}</summary>
+                    <p><strong>Quando:</strong> {{ v.tool_context }}</p>
+                    <pre>{{ v.content }}</pre>
+                    <div class="btn-row">
+                        <form method="post" action="/config/tasks/versions/restore/{{ v.id }}"><button type="submit">Restaurar</button></form>
+                        <form method="post" action="/config/tasks/versions/delete/{{ v.id }}" onsubmit="return confirm('Excluir esta versão?');"><button type="submit" class="danger-btn">Apagar versão</button></form>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="record-card">
+                <h3>Rotinas cadastradas</h3>
+                {% if not tasks %}<p>Nenhuma rotina agendada.</p>{% endif %}
+                {% for t in tasks %}
+                <div class="record-card">
+                    <div class="panel-header" style="margin-bottom: 6px;">
+                        <div>
+                            <h3>{{ t.title }}</h3>
+                            <span class="badge">{{ t.schedule_hours }}</span>
+                        </div>
+                        <div class="btn-row" style="margin-top: 0;">
+                            <a href="/config?edit_task={{ t.id }}#agenda" class="btn secondary-btn">Editar</a>
+                            <form method="post" action="/config/tasks/delete/{{ t.id }}" style="margin: 0;" onsubmit="return confirm('Remover esta rotina?');">
+                                <button type="submit" class="danger-btn">Remover</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% if t.condition_script %}<p><span class="badge">gatilho Python</span></p>{% endif %}
+                    <p>{{ t.prompt }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
 
 <section class="panel">
     <div class="panel-header"><div><h2>Histórico de configurações</h2><p>O histórico registra a def e os parâmetros operacionais; tokens são mascarados.</p></div><span class="badge">{{ versions|length }} versões</span></div>
