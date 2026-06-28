@@ -146,16 +146,21 @@ def _parse_json_sequence(text: str) -> Tuple[List[Any], str]:
         idx = end
     return values, ""
 
-def _limpar_resposta_modelo_para_json(text: str) -> str:
+def _remover_cercas_markdown_json(text: str) -> str:
     s = (text or "").strip()
 
     if s.startswith("```"):
         partes = s.split("\n", 1)
-        if len(partes) > 1:
-            s = partes[1]
-        if s.rstrip().endswith("```"):
-            s = s.rstrip()[:-3]
-        s = s.strip()
+        s = partes[1] if len(partes) > 1 else ""
+
+    if s.rstrip().endswith("```"):
+        s = s.rstrip()[:-3]
+
+    return s.strip()
+
+
+def _limpar_resposta_modelo_para_json(text: str) -> str:
+    s = _remover_cercas_markdown_json(text)
 
     while True:
         s_strip = s.lstrip()
@@ -165,7 +170,9 @@ def _limpar_resposta_modelo_para_json(text: str) -> str:
             fim = lowered.find(f"</{tag}>")
             if fim == -1:
                 break
-            s = s_strip[fim + len(f"</{tag}>"):].strip()
+            s = _remover_cercas_markdown_json(
+                s_strip[fim + len(f"</{tag}>"):]
+            )
             continue
         break
 
@@ -177,7 +184,7 @@ def _limpar_resposta_modelo_para_json(text: str) -> str:
         if primeiro_json > 0:
             s = s[primeiro_json:].strip()
 
-    return s
+    return _remover_cercas_markdown_json(s)
 
 def _protocolo_json_reenvio_msg() -> str:
     return (
