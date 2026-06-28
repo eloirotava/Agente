@@ -174,7 +174,7 @@ async def disparar_maestro_local(titulo: str, prompt: str, cfg: dict | None = No
 
     async with semaphore:
         try:
-            from app.routers.maestro import processar_orquestracao
+            from app.core import processar_orquestracao
 
             coro = processar_orquestracao(
                 mensagem=prompt,
@@ -222,7 +222,7 @@ async def _executar_dispatch_agenda_customizado(
     cfg: dict,
 ) -> None:
     async def chamar_maestro(mensagem: str | None = None, origem: str | None = None):
-        from app.routers.maestro import processar_orquestracao
+        from app.core import processar_orquestracao
 
         return await processar_orquestracao(
             mensagem=mensagem or evento.get("prompt", ""),

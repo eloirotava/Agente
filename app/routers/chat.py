@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.routers.maestro import processar_orquestracao
+from app.core import processar_orquestracao
 
 router = APIRouter(prefix="/chat")
 templates = Jinja2Templates(directory="app/templates")

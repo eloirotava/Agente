@@ -20,7 +20,7 @@ from app.db import (
     restore_endpoint_version,
     save_hook,
 )
-from app.routers.maestro import processar_orquestracao
+from app.core import processar_orquestracao
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")

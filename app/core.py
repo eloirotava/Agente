@@ -4,7 +4,6 @@ import inspect
 import traceback  # Rastreio completo de erros
 from typing import Any, List, Tuple
 
-from fastapi import APIRouter
 
 from app.db import (
     get_config,
@@ -13,11 +12,9 @@ from app.db import (
     get_tool,
     get_all_tools,
     log_interaction,
-    get_latest_endpoint_version_number,
 )
 from app.llm_gateway import call_llm_messages, config_fingerprint
 
-router = APIRouter()
 
 MAX_ERROS_FORMATO_CONSECUTIVOS = 3
 

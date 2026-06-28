@@ -11,7 +11,6 @@ from app.routers import (
     chat,
     knowledge,
     logs,
-    tasks,
     hooks,
 )
 from app.worker import start_periodic_scheduler
@@ -37,7 +36,6 @@ app.include_router(config.router)
 app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(logs.router)
-app.include_router(tasks.router)
 app.include_router(hooks.router)
 
 
