@@ -15,6 +15,8 @@ async def gerar_resposta(messages, cfg):
 
 DEFAULTS = {
     "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
+    "assistant_html_code": "",
+    "assistant_handler_code": "",
     "scheduler_condition_hard_timeout_seconds": "",
     "scheduler_maestro_hard_timeout_seconds": "",
     "scheduler_max_concurrent_jobs": "1",

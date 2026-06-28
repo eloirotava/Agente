@@ -30,6 +30,24 @@
     <div class="panel">
         <div class="panel-header">
             <div>
+                <h2>Assistente configurável</h2>
+                <p>Defina a interface HTML e o Python que recebe o submit. Assim o chat pode virar texto, texto+imagem, áudio ou qualquer outro formulário.</p>
+            </div>
+            <span class="badge">UI + def</span>
+        </div>
+        <div class="alert info">
+            A rota <code>/chat</code> renderiza este HTML no GET. No POST, executa <code>atender(request, cfg, helpers)</code> ou <code>executar(...)</code>; se vazio, usa o chat de texto simples.
+        </div>
+        <label>HTML do assistente</label>
+        <textarea name="assistant_html_code" rows="14" class="code" placeholder="&lt;form method='post' enctype='multipart/form-data'&gt;...&lt;/form&gt;">{{ cfg.assistant_html_code }}</textarea>
+
+        <label>Def Python do assistente</label>
+        <textarea name="assistant_handler_code" rows="14" class="code" placeholder="async def atender(request, cfg, helpers):&#10;    form = await request.form()&#10;    return await helpers['processar_orquestracao'](...)">{{ cfg.assistant_handler_code }}</textarea>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
                 <h2>Operação local</h2>
                 <p>Configurações do runtime do agente, separadas do modelo.</p>
             </div>

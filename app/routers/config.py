@@ -41,6 +41,8 @@ def config_get(request: Request):
 def config_post(
     request: Request,
     llm_provider_code: str = Form(""),
+    assistant_html_code: str = Form(""),
+    assistant_handler_code: str = Form(""),
     scheduler_condition_hard_timeout_seconds: str = Form(""),
     scheduler_maestro_hard_timeout_seconds: str = Form(""),
     scheduler_max_concurrent_jobs: str = Form("1"),
@@ -51,6 +53,8 @@ def config_post(
 ):
     save_config({
         "llm_provider_code": llm_provider_code,
+        "assistant_html_code": assistant_html_code,
+        "assistant_handler_code": assistant_handler_code,
         "scheduler_condition_hard_timeout_seconds": scheduler_condition_hard_timeout_seconds,
         "scheduler_maestro_hard_timeout_seconds": scheduler_maestro_hard_timeout_seconds,
         "scheduler_max_concurrent_jobs": scheduler_max_concurrent_jobs,
