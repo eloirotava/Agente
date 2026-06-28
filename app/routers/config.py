@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from app.db import get_config, save_config, get_config_versions, delete_config_version
+from app.db import (
+    delete_config_version,
+    get_config,
+    get_config_versions,
+    restore_config_version,
+    save_config,
+)
 
 router = APIRouter(prefix="/config")
 templates = Jinja2Templates(directory="app/templates")
@@ -38,6 +44,13 @@ def config_post(
         name="config.html",
         context={"cfg": get_config(), "versions": get_config_versions(), "saved": True}
     )
+
+
+@router.post("/versions/restore/{version_id}")
+def config_version_restore(version_id: int):
+    restored = restore_config_version(version_id)
+    suffix = "restored=1" if restored else "restore_missing=1"
+    return RedirectResponse(url=f"/config?{suffix}", status_code=303)
 
 
 @router.post("/versions/delete/{version_id}")

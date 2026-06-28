@@ -3,6 +3,8 @@
 {% block content %}
 {% if saved %}<div class="alert success">Configurações atualizadas e versionadas.</div>{% endif %}
 {% if request.query_params.get('deleted_version') %}<div class="alert danger">Versão de configuração removida.</div>{% endif %}
+{% if request.query_params.get('restored') %}<div class="alert success">Configuração anterior carregada. Tokens mascarados no histórico não substituem tokens atuais.</div>{% endif %}
+{% if request.query_params.get('restore_missing') %}<div class="alert danger">Versão de configuração não encontrada.</div>{% endif %}
 
 <form method="post">
     <div class="panel">
@@ -60,7 +62,10 @@
     <details class="record-card">
         <summary><strong>v{{ v.version_number }}</strong> · {{ v.created_at }} · {{ v.change_note or 'sem nota' }}</summary>
         <pre>{{ v.config_json }}</pre>
-        <form method="post" action="/config/versions/delete/{{ v.id }}" onsubmit="return confirm('Excluir esta versão do histórico?');"><button class="danger-btn" type="submit">Apagar versão</button></form>
+        <div class="btn-row">
+            <form method="post" action="/config/versions/restore/{{ v.id }}" onsubmit="return confirm('Carregar esta configuração anterior? Tokens mascarados não serão restaurados.');"><button type="submit">Carregar configuração</button></form>
+            <form method="post" action="/config/versions/delete/{{ v.id }}" onsubmit="return confirm('Excluir esta versão do histórico?');"><button class="danger-btn" type="submit">Apagar versão</button></form>
+        </div>
     </details>
     {% endfor %}
 </section>

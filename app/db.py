@@ -509,6 +509,35 @@ def get_config_versions():
         return rows
 
 
+def restore_config_version(version_id: int):
+    with get_conn() as c:
+        cur = c.execute("SELECT * FROM config_versions WHERE id=?", (version_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+
+        version = dict(row)
+        config = json.loads(version["config_json"])
+
+        for key, value in config.items():
+            # Tokens/chaves são mascarados no snapshot. Não sobrescrever o valor
+            # atual com a máscara. O usuário mantém o segredo vigente.
+            if isinstance(value, str) and value == "********":
+                continue
+            c.execute(
+                """
+                INSERT INTO config_kv (k, v)
+                VALUES (?, ?)
+                ON CONFLICT(k) DO UPDATE SET v=excluded.v
+                """,
+                (key, str(value)),
+            )
+        c.commit()
+
+    version["config"] = config
+    return version
+
+
 def delete_config_version(version_id: int):
     with get_conn() as c:
         c.execute("DELETE FROM config_versions WHERE id=?", (version_id,))
