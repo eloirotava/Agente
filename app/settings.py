@@ -151,8 +151,19 @@ DEFAULT_ASSISTANT_HTML_CODE = r'''<!doctype html>
       catch { return {}; }
     }
     function saveConversations() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
-      localStorage.setItem("agente_assistant_active", activeId || "");
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+        localStorage.setItem("agente_assistant_active", activeId || "");
+      } catch (err) {
+        // Proteção contra quota do localStorage. Não persista base64 de imagem aqui.
+        for (const conv of Object.values(conversations)) {
+          for (const msg of (conv.messages || [])) {
+            delete msg.image_preview;
+          }
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+        localStorage.setItem("agente_assistant_active", activeId || "");
+      }
     }
     function newConversation(render = true) {
       activeId = "conv_" + Date.now();
