@@ -2,12 +2,13 @@ import inspect
 import json
 
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from app.core import processar_orquestracao
-from app.db import get_config
 
-router = APIRouter(prefix="/chat")
+from app.core import processar_orquestracao
+from app.db import get_all_logs, get_config, get_conn
+
+router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -17,10 +18,6 @@ def _render_assistant_html(html: str, **values) -> str:
         rendered = rendered.replace("{{ " + key + " }}", str(value))
         rendered = rendered.replace("{{" + key + "}}", str(value))
     return rendered
-
-
-def _default_context(message: str = "", answer: str = "", logs: list | None = None) -> dict:
-    return {"message": message, "answer": answer, "logs": logs or []}
 
 
 async def _run_assistant_handler(request: Request, cfg: dict) -> Response:
@@ -57,7 +54,7 @@ async def _run_assistant_handler(request: Request, cfg: dict) -> Response:
     return HTMLResponse(str(result or ""))
 
 
-@router.get("", response_class=HTMLResponse)
+@router.get("/chat", response_class=HTMLResponse)
 def chat_get(request: Request):
     cfg = get_config()
     html = (cfg.get("assistant_html_code") or "").strip()
@@ -73,7 +70,8 @@ def chat_get(request: Request):
         )
     return templates.TemplateResponse(request=request, name="chat.html", context={})
 
-@router.post("", response_class=HTMLResponse)
+
+@router.post("/chat", response_class=HTMLResponse)
 async def chat_post(request: Request, message: str = Form("")):
     cfg = get_config()
     if (cfg.get("assistant_handler_code") or "").strip():
@@ -94,15 +92,27 @@ async def chat_post(request: Request, message: str = Form("")):
                 )
             return HTMLResponse(f"Erro no assistente configurado: {exc}", status_code=500)
 
-    # A MÁGICA: O Chat não tem mais cérebro. Ele consome o serviço do Maestro!
     resultado = await processar_orquestracao(mensagem=message, origem="Chat")
-
     return templates.TemplateResponse(
         request=request,
         name="chat.html",
-        context={
-            "message": message,
-            "answer": resultado["resposta_final"],
-            "logs": resultado["logs"]
-        }
+        context={"message": message, "answer": resultado["resposta_final"], "logs": resultado["logs"]},
     )
+
+
+@router.get("/logs", response_class=HTMLResponse)
+def logs_get(request: Request):
+    logs = get_all_logs()
+    return templates.TemplateResponse(
+        request=request,
+        name="logs.html",
+        context={"logs": logs, "cleared": request.query_params.get("cleared")},
+    )
+
+
+@router.post("/logs/clear")
+def logs_clear():
+    with get_conn() as c:
+        c.execute("DELETE FROM interactions_log")
+        c.commit()
+    return RedirectResponse(url="/logs?cleared=1", status_code=303)

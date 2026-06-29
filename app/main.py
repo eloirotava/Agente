@@ -8,9 +8,8 @@ from app.db import init_db
 from app.routers import (
     home,
     config,
-    chat,
+    runtime,
     knowledge,
-    logs,
     hooks,
 )
 from app.worker import start_periodic_scheduler
@@ -33,9 +32,8 @@ app.add_middleware(
 # Registrando todas as rotas
 app.include_router(home.router)
 app.include_router(config.router)
-app.include_router(chat.router)
+app.include_router(runtime.router)
 app.include_router(knowledge.router)
-app.include_router(logs.router)
 app.include_router(hooks.router)
 
 
