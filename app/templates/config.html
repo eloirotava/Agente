@@ -11,8 +11,26 @@
 {% if request.query_params.get('task_version_deleted') %}<div class="alert danger">Versão da rotina removida.</div>{% endif %}
 {% if request.query_params.get('task_restore_missing') %}<div class="alert danger">Versão da rotina não encontrada.</div>{% endif %}
 
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Partes configuráveis</h2>
+            <p>Cada bloco abaixo continua salvo no histórico versionado de configurações.</p>
+        </div>
+        <span class="badge">versionado</span>
+    </div>
+    <div class="btn-row">
+        <a class="btn secondary-btn" href="#modelo">Modelo</a>
+        <a class="btn secondary-btn" href="#assistente">Assistente</a>
+        <a class="btn secondary-btn" href="#observabilidade">Logs</a>
+        <a class="btn secondary-btn" href="#runtime">Runtime</a>
+        <a class="btn secondary-btn" href="#agenda">Agenda</a>
+        <a class="btn secondary-btn" href="#historico-config">Histórico</a>
+    </div>
+</section>
+
 <form method="post">
-    <div class="panel">
+    <div class="panel" id="modelo">
         <div class="panel-header">
             <div>
                 <h2>Modelo via def Python</h2>
@@ -27,7 +45,7 @@
         <input name="change_note" placeholder="Ex: troquei modelo, URL ou parâmetros dentro da def"/>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="assistente">
         <div class="panel-header">
             <div>
                 <h2>Assistente configurável</h2>
@@ -45,7 +63,22 @@
         <textarea name="assistant_handler_code" rows="14" class="code" placeholder="async def atender(request, cfg, helpers):&#10;    form = await request.form()&#10;    return await helpers['processar_orquestracao'](...)">{{ cfg.assistant_handler_code }}</textarea>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="observabilidade">
+        <div class="panel-header">
+            <div>
+                <h2>Logs configuráveis</h2>
+                <p>Defina como interações são persistidas. Use para remover imagens/base64, mascarar tokens ou mandar logs para outro destino.</p>
+            </div>
+            <span class="badge">def log</span>
+        </div>
+        <div class="alert info">
+            Defina <code>salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers)</code>. O helper <code>default_log_interaction</code> salva no SQLite atual.
+        </div>
+        <label>Def de persistência do log</label>
+        <textarea name="log_persist_code" rows="12" class="code" placeholder="async def salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers):&#10;    helpers['default_log_interaction'](mensagem, log_raciocinio, resposta_final)">{{ cfg.log_persist_code }}</textarea>
+    </div>
+
+    <div class="panel" id="runtime">
         <div class="panel-header">
             <div>
                 <h2>Operação local</h2>
@@ -172,7 +205,7 @@
     </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="historico-config">
     <div class="panel-header"><div><h2>Histórico de configurações</h2><p>O histórico registra a def e os parâmetros operacionais; tokens são mascarados.</p></div><span class="badge">{{ versions|length }} versões</span></div>
     {% if not versions %}<div class="alert info">Nenhuma versão registrada ainda.</div>{% endif %}
     {% for v in versions %}

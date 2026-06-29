@@ -308,6 +308,40 @@ DEFAULT_ASSISTANT_HANDLER_CODE = r'''async def atender(request, cfg, helpers):
     )
 '''
 
+DEFAULT_LOG_PERSIST_CODE = r'''async def salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers):
+    import json
+    import re
+
+    def limpar(obj):
+        texto = obj if isinstance(obj, str) else json.dumps(obj, ensure_ascii=False, default=str)
+
+        # Troca data URLs/base64 de imagens por marcador curto.
+        texto = re.sub(
+            r"data:image/[^;\s]+;base64,[A-Za-z0-9+/=]+",
+            "[imagem omitida do log]",
+            texto,
+        )
+
+        # Cobre também dicts OpenAI-compatible quando viram string.
+        texto = re.sub(
+            r"'url':\s*'data:image/[^']+'",
+            "'url': '[imagem omitida do log]'",
+            texto,
+        )
+        texto = re.sub(
+            r'"url":\s*"data:image/[^"]+"',
+            '"url": "[imagem omitida do log]"',
+            texto,
+        )
+        return texto
+
+    helpers["default_log_interaction"](
+        limpar(mensagem),
+        limpar(log_raciocinio),
+        limpar(resposta_final),
+    )
+'''
+
 DEFAULTS = {
     "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
     "assistant_html_code": DEFAULT_ASSISTANT_HTML_CODE,
@@ -317,5 +351,6 @@ DEFAULTS = {
     "scheduler_max_concurrent_jobs": "1",
     "scheduler_default_hook_slug": "",
     "scheduler_dispatch_code": "",
-    "maestro_core_code": ""
+    "maestro_core_code": "",
+    "log_persist_code": DEFAULT_LOG_PERSIST_CODE
 }

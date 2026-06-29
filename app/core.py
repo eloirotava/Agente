@@ -156,6 +156,40 @@ def _normalizar_retorno_core_customizado(resultado: Any) -> tuple[str, List[str]
     return str(resultado or ""), ["Core customizado retornou texto simples."]
 
 
+async def _persistir_log_configuravel(
+    cfg: dict,
+    mensagem_usuario: Any,
+    log_raciocinio: str,
+    resposta_final: str,
+) -> None:
+    code = (cfg.get("log_persist_code") or "").strip()
+    if not code:
+        log_interaction(str(mensagem_usuario), log_raciocinio, resposta_final)
+        return
+
+    helpers = {
+        "log_interaction": log_interaction,
+        "default_log_interaction": log_interaction,
+        "json": json,
+    }
+    scope = {"json": json, **helpers}
+    exec(code, scope, scope)
+    func = scope.get("salvar_log") or scope.get("salvar") or scope.get("executar")
+    if not callable(func):
+        raise RuntimeError("log_persist_code deve expor salvar_log(mensagem, log, resposta, cfg, helpers).")
+
+    params = inspect.signature(func).parameters
+    if len(params) <= 3:
+        result = func(mensagem_usuario, log_raciocinio, resposta_final)
+    elif len(params) == 4:
+        result = func(mensagem_usuario, log_raciocinio, resposta_final, cfg)
+    else:
+        result = func(mensagem_usuario, log_raciocinio, resposta_final, cfg, helpers)
+
+    if inspect.isawaitable(result):
+        await result
+
+
 async def _processar_core_customizado(
     core_code: str,
     mensagem: str,
@@ -171,6 +205,7 @@ async def _processar_core_customizado(
         "get_tool": get_tool,
         "get_all_tools": get_all_tools,
         "log_interaction": log_interaction,
+        "persistir_log": _persistir_log_configuravel,
         "executar_comandos": _executar_comandos_maestro,
         "limpar_json": _limpar_resposta_modelo_para_json,
         "parse_json_sequence": _parse_json_sequence,
@@ -215,7 +250,8 @@ async def _processar_core_customizado(
         resposta_final = "Erro no core customizado do Maestro. Verifique o Log de Raciocínio."
         logs.append(f"ERRO NO CORE CUSTOMIZADO:\n{traceback.format_exc()}")
 
-    log_interaction(
+    await _persistir_log_configuravel(
+        cfg,
         mensagem if origem == "Chat" else f"[{origem}] {mensagem}",
         "\n".join(logs),
         resposta_final,
@@ -233,7 +269,8 @@ async def processar_orquestracao(mensagem: str, origem: str):
         f"[ORIGEM: {origem}]",
         "MAESTRO CORE: nenhuma def configurada; core padrão desativado.",
     ]
-    log_interaction(
+    await _persistir_log_configuravel(
+        cfg,
         mensagem if origem == "Chat" else f"[{origem}] {mensagem}",
         "\n".join(logs),
         resposta_final,
