@@ -2,227 +2,83 @@
 {% block page_title %}Configurações{% endblock %}
 {% block content %}
 {% if saved %}<div class="alert success">Configurações atualizadas e versionadas.</div>{% endif %}
+{% if request.query_params.get('section_saved') %}<div class="alert success">Bloco {{ request.query_params.get('section_saved') }} salvo e versionado.</div>{% endif %}
 {% if request.query_params.get('deleted_version') %}<div class="alert danger">Versão de configuração removida.</div>{% endif %}
 {% if request.query_params.get('restored') %}<div class="alert success">Configuração anterior carregada. Tokens mascarados no histórico não substituem tokens atuais.</div>{% endif %}
 {% if request.query_params.get('restore_missing') %}<div class="alert danger">Versão de configuração não encontrada.</div>{% endif %}
-{% if request.query_params.get('task_saved') %}<div class="alert success">Rotina da agenda salva e versionada.</div>{% endif %}
-{% if request.query_params.get('task_deleted') %}<div class="alert danger">Rotina da agenda removida.</div>{% endif %}
-{% if request.query_params.get('task_restored') %}<div class="alert success">Versão da rotina restaurada.</div>{% endif %}
-{% if request.query_params.get('task_version_deleted') %}<div class="alert danger">Versão da rotina removida.</div>{% endif %}
-{% if request.query_params.get('task_restore_missing') %}<div class="alert danger">Versão da rotina não encontrada.</div>{% endif %}
 
 <section class="panel">
     <div class="panel-header">
         <div>
             <h2>Partes configuráveis</h2>
-            <p>Cada bloco abaixo continua salvo no histórico versionado de configurações.</p>
+            <p>Cada bloco salva isoladamente e cria uma versão de configuração.</p>
         </div>
-        <span class="badge">versionado</span>
+        <span class="badge">versionado por bloco</span>
     </div>
     <div class="btn-row">
         <a class="btn secondary-btn" href="#modelo">Modelo</a>
         <a class="btn secondary-btn" href="#assistente">Assistente</a>
         <a class="btn secondary-btn" href="#observabilidade">Logs</a>
         <a class="btn secondary-btn" href="#rotas-http">Rotas HTTP</a>
-        <a class="btn secondary-btn" href="#runtime">Runtime</a>
-        <a class="btn secondary-btn" href="#agenda">Agenda</a>
+        <a class="btn secondary-btn" href="#runtime">Runtime/Worker</a>
         <a class="btn secondary-btn" href="#historico-config">Histórico</a>
+        <a class="btn secondary-btn" href="/agenda">Abrir Agenda</a>
     </div>
 </section>
 
-<form method="post">
-    <div class="panel" id="modelo">
-        <div class="panel-header">
-            <div>
-                <h2>Modelo via def Python</h2>
-                <p>Todo o provider do LLM fica aqui: URL, modelo, autenticação, multimodalidade, timeouts e parâmetros.</p>
-            </div>
-            <span class="badge">def única</span>
-        </div>
-        <div class="alert info">Defina <code>gerar_resposta(messages, cfg)</code> ou <code>executar(messages, cfg)</code>. O Maestro sempre envia a lista <code>messages</code> e espera texto de volta.</div>
-        <label>Def do modelo</label>
-        <textarea name="llm_provider_code" rows="18" class="code" placeholder="async def gerar_resposta(messages, cfg):&#10;    return '...';">{{ cfg.llm_provider_code }}</textarea>
-        <label>Nota da alteração <span class="field-hint">Entra no histórico de configurações.</span></label>
-        <input name="change_note" placeholder="Ex: troquei modelo, URL ou parâmetros dentro da def"/>
-    </div>
-
-    <div class="panel" id="assistente">
-        <div class="panel-header">
-            <div>
-                <h2>Assistente configurável</h2>
-                <p>Defina a interface HTML e o Python que recebe o submit. Assim o chat pode virar texto, texto+imagem, áudio ou qualquer outro formulário.</p>
-            </div>
-            <span class="badge">UI + def</span>
-        </div>
-        <div class="alert info">
-            A rota <code>/chat</code> renderiza este HTML no GET. No POST, executa <code>atender(request, cfg, helpers)</code> ou <code>executar(...)</code>; se vazio, usa o chat de texto simples.
-        </div>
-        <label>HTML do assistente</label>
-        <textarea name="assistant_html_code" rows="14" class="code" placeholder="&lt;form method='post' enctype='multipart/form-data'&gt;...&lt;/form&gt;">{{ cfg.assistant_html_code }}</textarea>
-
-        <label>Def Python do assistente</label>
-        <textarea name="assistant_handler_code" rows="14" class="code" placeholder="async def atender(request, cfg, helpers):&#10;    form = await request.form()&#10;    return await helpers['processar_orquestracao'](...)">{{ cfg.assistant_handler_code }}</textarea>
-    </div>
-
-    <div class="panel" id="observabilidade">
-        <div class="panel-header">
-            <div>
-                <h2>Logs configuráveis</h2>
-                <p>Defina como interações são persistidas. Use para remover imagens/base64, mascarar tokens ou mandar logs para outro destino.</p>
-            </div>
-            <span class="badge">def log</span>
-        </div>
-        <div class="alert info">
-            Defina <code>salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers)</code>. O helper <code>default_log_interaction</code> salva no SQLite atual.
-        </div>
-        <label>Def de persistência do log</label>
-        <textarea name="log_persist_code" rows="12" class="code" placeholder="async def salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers):&#10;    helpers['default_log_interaction'](mensagem, log_raciocinio, resposta_final)">{{ cfg.log_persist_code }}</textarea>
-    </div>
-
-    <div class="panel" id="rotas-http">
-        <div class="panel-header">
-            <div>
-                <h2>Rotas HTTP configuráveis</h2>
-                <p>Defina como caminhos como /chat, /logs e /hook/... respondem. Assim os routers físicos podem sumir e o comportamento fica no banco.</p>
-            </div>
-            <span class="badge">def rotas</span>
-        </div>
-        <div class="alert info">
-            Defina <code>rotear(request, path, cfg, helpers)</code>. Retorne HTMLResponse, JSONResponse, RedirectResponse, dict ou string.
-        </div>
-        <label>Def das rotas HTTP</label>
-        <textarea name="http_routes_code" rows="18" class="code" placeholder="async def rotear(request, path, cfg, helpers):&#10;    return helpers['HTMLResponse']('ok')">{{ cfg.http_routes_code }}</textarea>
-    </div>
-
-    <div class="panel" id="runtime">
-        <div class="panel-header">
-            <div>
-                <h2>Operação local</h2>
-                <p>Configurações do runtime do agente, separadas do modelo.</p>
-            </div>
-            <span class="badge">agente</span>
-        </div>
-        <div class="grid-3">
-            <div>
-                <label>Timeout do gatilho Python (s, vazio = sem cortar)</label>
-                <input name="scheduler_condition_hard_timeout_seconds" value="{{ cfg.scheduler_condition_hard_timeout_seconds }}"/>
-            </div>
-            <div>
-                <label>Timeout da chamada do Maestro (s, vazio = sem cortar)</label>
-                <input name="scheduler_maestro_hard_timeout_seconds" value="{{ cfg.scheduler_maestro_hard_timeout_seconds }}"/>
-            </div>
-            <div>
-                <label>Jobs simultâneos da agenda</label>
-                <input name="scheduler_max_concurrent_jobs" value="{{ cfg.scheduler_max_concurrent_jobs }}"/>
-            </div>
-        </div>
-        <label>Hook default da agenda <span class="field-hint">Opcional. Valor disponível em cfg para o seu dispatch customizado. O core interno não chama mais hook/Maestro automaticamente.</span></label>
-        <input name="scheduler_default_hook_slug" value="{{ cfg.scheduler_default_hook_slug }}" placeholder="ex: entrada_agenda"/>
-        <div class="alert info" style="margin-top: 12px;">
-            Fluxo mínimo agora é configurado: cole uma def em "Dispatch da agenda" e outra em "Core do Maestro". Se uma delas ficar vazia, o agente registra o problema em vez de usar um core padrão escondido.
-        </div>
-
-        <details style="margin-top: 14px;">
-            <summary><strong>Core avançado em Python</strong></summary>
-            <div class="alert info" style="margin-top: 12px;">
-                Cole aqui os cores em Python. Não há Maestro/agenda padrão escondidos: se ficar vazio, o agente não executa aquele fluxo.
-            </div>
-            <label>Dispatch da agenda <span class="field-hint">Defina async/sync despachar_agenda(evento, cfg, helpers). Também aceita despachar_evento_agenda(titulo, prompt, cfg, agora_str) para facilitar colar código antigo.</span></label>
-            <textarea name="scheduler_dispatch_code" rows="10" class="code" placeholder="async def despachar_agenda(evento, cfg, helpers):&#10;    await helpers['processar_orquestracao'](mensagem=evento['prompt'], origem=evento['origem'])">{{ cfg.scheduler_dispatch_code }}</textarea>
-
-            <label>Core do Maestro <span class="field-hint">Defina async/sync processar(mensagem, origem, cfg, helpers). Também aceita processar_orquestracao(mensagem, origem).</span></label>
-            <textarea name="maestro_core_code" rows="12" class="code" placeholder="async def processar(mensagem, origem, cfg, helpers):&#10;    return {'resposta_final': 'ok', 'logs': ['custom']}&#10;&#10;# ou: async def processar_orquestracao(mensagem, origem): ...">{{ cfg.maestro_core_code }}</textarea>
-        </details>
-
-    </div>
-    <div class="btn-row"><button type="submit">Salvar configurações</button></div>
+<form method="post" action="/config/section/modelo#modelo" class="panel" id="modelo">
+    <div class="panel-header"><div><h2>Modelo via def Python</h2><p>Provider do LLM: URL, modelo, autenticação, multimodalidade, timeouts e parâmetros.</p></div><span class="badge">def única</span></div>
+    <div class="alert info">Defina <code>gerar_resposta(messages, cfg)</code> ou <code>executar(messages, cfg)</code>.</div>
+    <label>Def do modelo</label>
+    <textarea name="llm_provider_code" rows="18" class="code">{{ cfg.llm_provider_code }}</textarea>
+    <label>Nota da alteração</label><input name="change_note" placeholder="Ex: troquei modelo ou parâmetros">
+    <div class="btn-row"><button type="submit">Salvar modelo</button></div>
 </form>
 
-<section class="panel" id="agenda">
-    <div class="panel-header">
-        <div>
-            <h2>Agenda configurada</h2>
-            <p>Cadastre rotinas aqui mesmo. Use horários fixos (<code>08:00, 16:30</code>) ou intervalos em minutos (<code>*/1m</code>, <code>*/5m</code>).</p>
-        </div>
-        <span class="badge">{{ tasks|length }} rotinas</span>
+<form method="post" action="/config/section/assistente#assistente" class="panel" id="assistente">
+    <div class="panel-header"><div><h2>Assistente configurável</h2><p>HTML e Python do submit. Pode virar texto, texto+imagem, áudio ou qualquer formulário.</p></div><span class="badge">UI + def</span></div>
+    <label>HTML do assistente</label>
+    <textarea name="assistant_html_code" rows="14" class="code">{{ cfg.assistant_html_code }}</textarea>
+    <label>Def Python do assistente</label>
+    <textarea name="assistant_handler_code" rows="14" class="code">{{ cfg.assistant_handler_code }}</textarea>
+    <label>Nota da alteração</label><input name="change_note" placeholder="Ex: ajustei histórico ou upload">
+    <div class="btn-row"><button type="submit">Salvar assistente</button></div>
+</form>
+
+<form method="post" action="/config/section/observabilidade#observabilidade" class="panel" id="observabilidade">
+    <div class="panel-header"><div><h2>Logs configuráveis</h2><p>Defina como interações são persistidas, incluindo limpeza de imagens/base64.</p></div><span class="badge">def log</span></div>
+    <div class="alert info">Defina <code>salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers)</code>.</div>
+    <label>Def de persistência do log</label>
+    <textarea name="log_persist_code" rows="12" class="code">{{ cfg.log_persist_code }}</textarea>
+    <label>Nota da alteração</label><input name="change_note" placeholder="Ex: limpei imagens do log">
+    <div class="btn-row"><button type="submit">Salvar logs</button></div>
+</form>
+
+<form method="post" action="/config/section/rotas-http#rotas-http" class="panel" id="rotas-http">
+    <div class="panel-header"><div><h2>Rotas HTTP configuráveis</h2><p>Defina como /chat, /logs, /hook/..., /agenda e outros caminhos respondem.</p></div><span class="badge">def rotas</span></div>
+    <div class="alert info">Defina <code>rotear(request, path, cfg, helpers)</code>. Retorne Response, dict ou string.</div>
+    <label>Def das rotas HTTP</label>
+    <textarea name="http_routes_code" rows="18" class="code">{{ cfg.http_routes_code }}</textarea>
+    <label>Nota da alteração</label><input name="change_note" placeholder="Ex: adicionei /agenda">
+    <div class="btn-row"><button type="submit">Salvar rotas HTTP</button></div>
+</form>
+
+<form method="post" action="/config/section/runtime#runtime" class="panel" id="runtime">
+    <div class="panel-header"><div><h2>Runtime e Worker</h2><p>Configurações do worker, scheduler, dispatch da agenda e core do Maestro.</p></div><span class="badge">worker</span></div>
+    <div class="grid-3">
+        <div><label>Timeout do gatilho Python (s, vazio = sem cortar)</label><input name="scheduler_condition_hard_timeout_seconds" value="{{ cfg.scheduler_condition_hard_timeout_seconds }}"></div>
+        <div><label>Timeout da chamada do Maestro (s, vazio = sem cortar)</label><input name="scheduler_maestro_hard_timeout_seconds" value="{{ cfg.scheduler_maestro_hard_timeout_seconds }}"></div>
+        <div><label>Jobs simultâneos da agenda</label><input name="scheduler_max_concurrent_jobs" value="{{ cfg.scheduler_max_concurrent_jobs }}"></div>
     </div>
-    <div class="alert info">
-        O worker continua lendo estas rotinas do banco. O que foi removido foi o arquivo/router físico <code>tasks.py</code>; a gestão da agenda agora fica nesta tela de configuração.
-    </div>
-
-    <div class="grid-2">
-        <form method="post" action="/config/tasks" class="record-card">
-            <h3>{{ 'Editar rotina' if edit_task else 'Nova rotina' }}</h3>
-            {% if edit_task %}<input type="hidden" name="task_id" value="{{ edit_task.id }}">{% endif %}
-
-            <label>Nota da versão <span class="field-hint">Opcional. Ajuda no histórico.</span></label>
-            <input name="change_note" placeholder="Ex: ajustei para rodar a cada minuto">
-
-            <label>Nome da rotina</label>
-            <input type="text" name="title" value="{{ edit_task.title if edit_task else '' }}" required placeholder="Ex: Teste a cada minuto">
-
-            <label>Quando rodar <span class="field-hint">Ex: <code>*/1m</code> para todo minuto, <code>08:00</code> para horário fixo, ou <code>08:00, 16:00</code>.</span></label>
-            <input type="text" name="schedule_hours" value="{{ edit_task.schedule_hours if edit_task else '' }}" required placeholder="*/1m">
-
-            <label>Gatilho Python opcional <span class="field-hint">Defina <code>avaliar()</code>. Retorne False para não disparar; string vira alerta anexado ao prompt.</span></label>
-            <textarea name="condition_script" rows="6" class="code" placeholder="def avaliar():&#10;    return True">{{ edit_task.condition_script if edit_task else '' }}</textarea>
-
-            <label>Prompt enviado ao dispatch da agenda</label>
-            <textarea name="prompt" rows="6" required placeholder="Ex: diga apenas teste de agenda ok">{{ edit_task.prompt if edit_task else '' }}</textarea>
-
-            <div class="btn-row">
-                <button type="submit">{{ 'Salvar rotina' if edit_task else 'Criar rotina' }}</button>
-                {% if edit_task %}<a href="/config#agenda" class="btn secondary-btn">Cancelar edição</a>{% endif %}
-            </div>
-        </form>
-
-        <div>
-            {% if edit_task %}
-            <div class="record-card">
-                <h3>Histórico desta rotina</h3>
-                {% if not task_versions %}<p>Nenhuma versão registrada ainda.</p>{% endif %}
-                {% for v in task_versions %}
-                <details>
-                    <summary>v{{ v.version_number }} · {{ v.created_at }} · {{ v.change_note or 'sem nota' }}</summary>
-                    <p><strong>Quando:</strong> {{ v.tool_context }}</p>
-                    <pre>{{ v.content }}</pre>
-                    <div class="btn-row">
-                        <form method="post" action="/config/tasks/versions/restore/{{ v.id }}"><button type="submit">Restaurar</button></form>
-                        <form method="post" action="/config/tasks/versions/delete/{{ v.id }}" onsubmit="return confirm('Excluir esta versão?');"><button type="submit" class="danger-btn">Apagar versão</button></form>
-                    </div>
-                </details>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <div class="record-card">
-                <h3>Rotinas cadastradas</h3>
-                {% if not tasks %}<p>Nenhuma rotina agendada.</p>{% endif %}
-                {% for t in tasks %}
-                <div class="record-card">
-                    <div class="panel-header" style="margin-bottom: 6px;">
-                        <div>
-                            <h3>{{ t.title }}</h3>
-                            <span class="badge">{{ t.schedule_hours }}</span>
-                        </div>
-                        <div class="btn-row" style="margin-top: 0;">
-                            <a href="/config?edit_task={{ t.id }}#agenda" class="btn secondary-btn">Editar</a>
-                            <form method="post" action="/config/tasks/delete/{{ t.id }}" style="margin: 0;" onsubmit="return confirm('Remover esta rotina?');">
-                                <button type="submit" class="danger-btn">Remover</button>
-                            </form>
-                        </div>
-                    </div>
-                    {% if t.condition_script %}<p><span class="badge">gatilho Python</span></p>{% endif %}
-                    <p>{{ t.prompt }}</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</section>
+    <label>Hook default da agenda</label><input name="scheduler_default_hook_slug" value="{{ cfg.scheduler_default_hook_slug }}" placeholder="ex: entrada_agenda">
+    <label>Dispatch da agenda</label><textarea name="scheduler_dispatch_code" rows="10" class="code">{{ cfg.scheduler_dispatch_code }}</textarea>
+    <label>Core do Maestro</label><textarea name="maestro_core_code" rows="12" class="code">{{ cfg.maestro_core_code }}</textarea>
+    <label>Nota da alteração</label><input name="change_note" placeholder="Ex: ajustei concorrência ou dispatch">
+    <div class="btn-row"><button type="submit">Salvar runtime/worker</button></div>
+</form>
 
 <section class="panel" id="historico-config">
-    <div class="panel-header"><div><h2>Histórico de configurações</h2><p>O histórico registra a def e os parâmetros operacionais; tokens são mascarados.</p></div><span class="badge">{{ versions|length }} versões</span></div>
+    <div class="panel-header"><div><h2>Histórico de configurações</h2><p>Snapshots de todos os blocos configuráveis.</p></div><span class="badge">{{ versions|length }} versões</span></div>
     {% if not versions %}<div class="alert info">Nenhuma versão registrada ainda.</div>{% endif %}
     {% for v in versions %}
     <details class="record-card">

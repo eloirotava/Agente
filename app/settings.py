@@ -409,6 +409,50 @@ DEFAULT_HTTP_ROUTES_CODE = r'''async def rotear(request, path, cfg, helpers):
             c.commit()
         return RedirectResponse(url="/logs?cleared=1", status_code=303)
 
+    if path == "agenda" and request.method == "GET":
+        from app.db import get_all_tasks, get_task, get_endpoint_versions
+        edit_id = request.query_params.get("edit_task")
+        edit = get_task(int(edit_id)) if edit_id and edit_id.isdigit() else None
+        tasks = get_all_tasks()
+        rows = ""
+        for t in tasks:
+            rows += f"""<div class='record-card'><h3>{t['title']}</h3><p><strong>Quando:</strong> {t['schedule_hours']}</p><p>{t['prompt']}</p><div class='btn-row'><a class='btn secondary-btn' href='/agenda?edit_task={t['id']}'>Editar</a><form method='post' action='/agenda/delete/{t['id']}'><button class='danger-btn'>Remover</button></form></div></div>"""
+        versions = get_endpoint_versions("task", str(edit["id"])) if edit else []
+        version_rows = ""
+        for v in versions:
+            version_rows += f"<details class='record-card'><summary>v{v['version_number']} · {v['created_at']} · {v.get('change_note') or 'sem nota'}</summary><pre>{v.get('content') or ''}</pre></details>"
+        historico = f"<section class='card'><h2>Histórico da rotina</h2>{version_rows}</section>" if edit else ""
+        html = f"""<!doctype html><html lang='pt-br'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Agenda</title><style>
+body{{font-family:system-ui;margin:0;background:#020617;color:#e5e7eb;padding:24px;}}a{{color:#38bdf8}}.grid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}.card{{border:1px solid #334155;border-radius:16px;background:#0f172a;padding:16px;margin-bottom:16px}}label{{display:block;font-weight:700;margin-top:10px}}input,textarea{{width:100%;box-sizing:border-box;border-radius:10px;border:1px solid #334155;background:#020617;color:#e5e7eb;padding:10px}}button,.btn{{display:inline-block;border:0;border-radius:999px;background:#38bdf8;color:#082f49;padding:10px 14px;font-weight:800;text-decoration:none;cursor:pointer}}.danger-btn{{background:#f87171;color:#450a0a}}.btn-row{{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}}@media(max-width:900px){{.grid{{grid-template-columns:1fr}}}}</style></head><body>
+<div class='card'><h1>Agenda</h1><p>Rotinas salvas no banco e executadas pelo worker. Use <code>*/1m</code>, <code>*/5m</code> ou horários como <code>08:00, 16:00</code>.</p><p><a href='/config#runtime'>Configurar worker/dispatch</a> · <a href='/config#rotas-http'>Configurar rotas</a></p></div>
+<div class='grid'><form method='post' action='/agenda' class='card'>
+<h2>{'Editar rotina' if edit else 'Nova rotina'}</h2><input type='hidden' name='task_id' value='{edit['id'] if edit else ''}'>
+<label>Nota da versão</label><input name='change_note'>
+<label>Nome</label><input name='title' required value='{edit['title'] if edit else ''}'>
+<label>Quando rodar</label><input name='schedule_hours' required value='{edit['schedule_hours'] if edit else ''}' placeholder='*/1m'>
+<label>Gatilho Python opcional</label><textarea name='condition_script' rows='6'>{edit['condition_script'] if edit else ''}</textarea>
+<label>Prompt</label><textarea name='prompt' rows='6' required>{edit['prompt'] if edit else ''}</textarea>
+<div class='btn-row'><button>Salvar rotina</button><a class='btn' href='/agenda'>Nova/Cancelar</a></div></form>
+<section class='card'><h2>Rotinas cadastradas ({len(tasks)})</h2>{rows}</section></div>{historico}</body></html>"""
+        return HTMLResponse(html)
+
+    if path == "agenda" and request.method == "POST":
+        from app.db import save_task, update_task
+        form = await request.form()
+        task_id = str(form.get("task_id") or "")
+        if task_id.isdigit():
+            update_task(int(task_id), form.get("title") or "", form.get("prompt") or "", form.get("schedule_hours") or "", form.get("condition_script") or "", change_note=form.get("change_note") or "")
+        else:
+            save_task(form.get("title") or "", form.get("prompt") or "", form.get("schedule_hours") or "", form.get("condition_script") or "", change_note=form.get("change_note") or "")
+        return RedirectResponse(url="/agenda", status_code=303)
+
+    if path.startswith("agenda/delete/") and request.method == "POST":
+        from app.db import delete_task
+        task_id = path.rsplit("/", 1)[-1]
+        if task_id.isdigit():
+            delete_task(int(task_id))
+        return RedirectResponse(url="/agenda", status_code=303)
+
     if path.startswith("hook/") and request.method == "POST":
         slug = path.split("/", 1)[1]
         payload = await request.json()

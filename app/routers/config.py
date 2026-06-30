@@ -80,6 +80,32 @@ def config_post(
     )
 
 
+@router.post("/section/{section}")
+async def config_section_post(section: str, request: Request):
+    form = await request.form()
+    allowed = {
+        "modelo": ["llm_provider_code"],
+        "assistente": ["assistant_html_code", "assistant_handler_code"],
+        "observabilidade": ["log_persist_code"],
+        "rotas-http": ["http_routes_code"],
+        "runtime": [
+            "scheduler_condition_hard_timeout_seconds",
+            "scheduler_maestro_hard_timeout_seconds",
+            "scheduler_max_concurrent_jobs",
+            "scheduler_default_hook_slug",
+            "scheduler_dispatch_code",
+            "maestro_core_code",
+        ],
+    }
+    keys = allowed.get(section)
+    if not keys:
+        return RedirectResponse(url="/config?section_missing=1", status_code=303)
+
+    data = {key: str(form.get(key) or "") for key in keys}
+    save_config(data, change_note=str(form.get("change_note") or f"Bloco {section} salvo"))
+    return RedirectResponse(url=f"/config?section_saved={section}#{section}", status_code=303)
+
+
 @router.post("/versions/restore/{version_id}")
 def config_version_restore(version_id: int):
     restored = restore_config_version(version_id)
