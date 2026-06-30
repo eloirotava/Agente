@@ -409,6 +409,73 @@ DEFAULT_HTTP_ROUTES_CODE = r'''async def rotear(request, path, cfg, helpers):
             c.commit()
         return RedirectResponse(url="/logs?cleared=1", status_code=303)
 
+    if path == "hooks" and request.method == "GET":
+        from html import escape
+        from app.db import get_all_hooks, get_hook
+        slug = request.query_params.get("hook") or ""
+        novo = request.query_params.get("novo")
+        hooks = get_all_hooks()
+        atual = None if novo else (get_hook(slug) if slug else (hooks[0] if hooks else None))
+        cards = ""
+        for h in hooks:
+            cards += f"<div class='card'><h3>{escape(h['title'])}</h3><p><code>{escape(h['slug'])}</code></p><p>{escape(h.get('description') or '')}</p><div class='btn-row'><a class='btn' href='/hooks?hook={escape(h['slug'])}'>Editar</a><form method='post' action='/hooks/delete/{escape(h['slug'])}'><button class='danger-btn'>Remover</button></form></div></div>"
+        html = f"""<!doctype html><html lang='pt-br'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Hooks</title><style>body{{font-family:system-ui;margin:0;background:#020617;color:#e5e7eb;padding:24px}}a{{color:#38bdf8}}.grid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}.card{{border:1px solid #334155;border-radius:16px;background:#0f172a;padding:16px;margin-bottom:16px}}label{{display:block;font-weight:700;margin-top:10px}}input,textarea{{width:100%;box-sizing:border-box;border-radius:10px;border:1px solid #334155;background:#020617;color:#e5e7eb;padding:10px}}button,.btn{{display:inline-block;border:0;border-radius:999px;background:#38bdf8;color:#082f49;padding:10px 14px;font-weight:800;text-decoration:none;cursor:pointer}}.danger-btn{{background:#f87171;color:#450a0a}}.btn-row{{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}}@media(max-width:900px){{.grid{{grid-template-columns:1fr}}}}</style></head><body><div class='card'><h1>Hooks</h1><p>Cada hook é uma def Python salva/versionada no banco. Exponha <code>receber(payload, headers)</code>.</p><p><a href='/config#rotas-http'>Configurar rotas HTTP</a></p></div><div class='grid'><form method='post' action='/hooks' class='card'><h2>{'Editar hook' if atual else 'Novo hook'}</h2><label>Slug</label><input name='slug' required value='{escape(atual['slug']) if atual else ''}'><label>Título</label><input name='title' required value='{escape(atual['title']) if atual else ''}'><label>Descrição</label><input name='description' value='{escape(atual.get('description') or '') if atual else ''}'><label><input type='checkbox' name='active' value='1' {'checked' if atual and int(atual.get('active') or 0) == 1 else ''}> Ativo</label><label>Nota da versão</label><input name='change_note'><label>Def receber(payload, headers)</label><textarea name='content' rows='14'>{escape(atual.get('content') or '') if atual else 'def receber(payload, headers):\n    return {"mensagem": payload, "origem": "HOOK"}'}</textarea><div class='btn-row'><button>Salvar hook</button><a class='btn' href='/hooks?novo=1'>Novo</a></div></form><section class='card'><h2>Hooks cadastrados ({len(hooks)})</h2>{cards}</section></div></body></html>"""
+        return HTMLResponse(html)
+
+    if path == "hooks" and request.method == "POST":
+        from app.db import save_hook
+        form = await request.form()
+        slug = str(form.get("slug") or "").strip().lower().replace(" ", "_")
+        save_hook(slug, form.get("title") or slug, form.get("description") or "", form.get("content") or "", 1 if form.get("active") == "1" else 0, change_note=form.get("change_note") or "")
+        return RedirectResponse(url=f"/hooks?hook={slug}", status_code=303)
+
+    if path.startswith("hooks/delete/") and request.method == "POST":
+        from app.db import delete_hook
+        slug = path.rsplit("/", 1)[-1]
+        delete_hook(slug)
+        return RedirectResponse(url="/hooks", status_code=303)
+
+    if path == "knowledge/tools" and request.method == "GET":
+        from html import escape
+        from app.db import get_context, get_general_contexts, get_tool, get_all_tools, get_endpoint_versions
+        selected = request.query_params.get("endpoint") or "context:system_prompt"
+        kind, _, slug = selected.partition(":")
+        if not slug:
+            slug = selected
+            kind = "tool" if get_tool(slug) else "context"
+        atual = get_context(slug) if kind == "context" else get_tool(slug)
+        if slug == "system_prompt" and not atual:
+            atual = {"slug":"system_prompt","title":"Diretriz Operacional Base","description_for_ai":"","content":"","bootstrap_json":""}
+            kind = "context"
+        cards = "<div class='card'><h3>Diretriz Operacional Base</h3><p><a class='btn' href='/knowledge/tools?endpoint=context:system_prompt'>Editar</a></p></div>"
+        for c in get_general_contexts():
+            cards += f"<div class='card'><h3>{escape(c['title'])}</h3><p>Manual · <code>{escape(c['slug'])}</code></p><p>{escape(c.get('description_for_ai') or '')}</p><a class='btn' href='/knowledge/tools?endpoint=context:{escape(c['slug'])}'>Editar</a></div>"
+        for t in get_all_tools():
+            cards += f"<div class='card'><h3>{escape(t['title'])}</h3><p>Python · <code>{escape(t['slug'])}</code></p><p>{escape(t.get('description_for_ai') or '')}</p><a class='btn' href='/knowledge/tools?endpoint=tool:{escape(t['slug'])}'>Editar</a></div>"
+        versions = get_endpoint_versions(kind, slug) if atual else []
+        version_rows = "".join([f"<details class='card'><summary>v{v['version_number']} · {v['created_at']} · {escape(v.get('change_note') or 'sem nota')}</summary><pre>{escape(v.get('content') or '')}</pre></details>" for v in versions])
+        content_value = (atual.get('content') if kind == 'tool' else atual.get('content') or atual.get('tool_context')) if atual else ''
+        tool_context = (atual.get('tool_context') if kind == 'tool' else atual.get('content')) if atual else ''
+        html = f"""<!doctype html><html lang='pt-br'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Endpoints</title><style>body{{font-family:system-ui;margin:0;background:#020617;color:#e5e7eb;padding:24px}}a{{color:#38bdf8}}.grid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}.card{{border:1px solid #334155;border-radius:16px;background:#0f172a;padding:16px;margin-bottom:16px}}label{{display:block;font-weight:700;margin-top:10px}}input,textarea,select{{width:100%;box-sizing:border-box;border-radius:10px;border:1px solid #334155;background:#020617;color:#e5e7eb;padding:10px}}button,.btn{{display:inline-block;border:0;border-radius:999px;background:#38bdf8;color:#082f49;padding:10px 14px;font-weight:800;text-decoration:none;cursor:pointer}}.danger-btn{{background:#f87171;color:#450a0a}}.btn-row{{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}}@media(max-width:900px){{.grid{{grid-template-columns:1fr}}}}</style></head><body><div class='card'><h1>Endpoints</h1><p>Manuais viram contexto. Python expõe <code>executar(cmd)</code> e pode ser chamado pelo Maestro.</p></div><div class='grid'><form method='post' action='/knowledge/tools' class='card'><h2>{'Editar endpoint' if atual else 'Novo endpoint'}</h2><label>Slug</label><input name='slug' required value='{escape(slug if atual else '')}'><label>Título</label><input name='title' required value='{escape(atual.get('title') if atual else '')}'><label>Descrição para IA</label><input name='description_for_ai' value='{escape(atual.get('description_for_ai') or '') if atual else ''}'><label>Manual/contexto</label><textarea name='tool_context' rows='8'>{escape(tool_context or '')}</textarea><label>Python executar(cmd) — preencha para virar endpoint Python</label><textarea name='content' rows='12'>{escape(content_value or '') if kind == 'tool' else ''}</textarea><label>Bootstrap JSON</label><textarea name='bootstrap_json' rows='4'>{escape(atual.get('bootstrap_json') or '') if atual else ''}</textarea><label>Nota da versão</label><input name='change_note'><div class='btn-row'><button>Salvar endpoint</button><a class='btn' href='/knowledge/tools?novo=1'>Novo</a></div></form><section class='card'><h2>Endpoints cadastrados</h2>{cards}</section></div>{'<section class="card"><h2>Histórico</h2>'+version_rows+'</section>' if atual else ''}</body></html>"""
+        return HTMLResponse(html)
+
+    if path == "knowledge/tools" and request.method == "POST":
+        from app.db import save_context, save_tool, delete_context, delete_tool
+        form = await request.form()
+        slug = str(form.get("slug") or "").strip().lower().replace(" ", "_")
+        title = form.get("title") or slug
+        desc = form.get("description_for_ai") or ""
+        manual = form.get("tool_context") or ""
+        code = (form.get("content") or "").strip()
+        note = form.get("change_note") or ""
+        if code:
+            save_tool(slug, title, desc, manual, code, change_note=note)
+            delete_context(slug)
+            return RedirectResponse(url=f"/knowledge/tools?endpoint=tool:{slug}", status_code=303)
+        save_context(slug, title, desc, manual, bootstrap_json=form.get("bootstrap_json") or "", change_note=note)
+        delete_tool(slug)
+        return RedirectResponse(url=f"/knowledge/tools?endpoint=context:{slug}", status_code=303)
+
     if path == "agenda" and request.method == "GET":
         from app.db import get_all_tasks, get_task, get_endpoint_versions
         edit_id = request.query_params.get("edit_task")
