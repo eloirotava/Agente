@@ -12,6 +12,8 @@ from app.db import get_config, init_db
 from app.routers import (
     home,
     config,
+    hooks,
+    knowledge,
 )
 from app.worker import start_periodic_scheduler
 
@@ -34,6 +36,8 @@ app.add_middleware(
 # Registrando todas as rotas
 app.include_router(home.router)
 app.include_router(config.router)
+app.include_router(hooks.router)
+app.include_router(knowledge.router)
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
