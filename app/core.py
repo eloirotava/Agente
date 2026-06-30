@@ -11,12 +11,39 @@ from app.db import (
     get_general_contexts,
     get_tool,
     get_all_tools,
+    get_hook,
     log_interaction,
 )
 from app.llm_gateway import call_llm_messages, config_fingerprint
 
 
 MAX_ERROS_FORMATO_CONSECUTIVOS = 3
+
+
+async def dispatch_hook(slug: str, payload: dict[str, Any], headers: dict[str, str] | None = None):
+    hook = get_hook(slug)
+    if not hook or int(hook.get("active") or 0) != 1:
+        raise RuntimeError("Hook não encontrado ou inativo.")
+
+    code = (hook.get("content") or "").strip()
+    if not code:
+        raise RuntimeError("Hook sem código Python receber().")
+
+    local_scope: dict[str, Any] = {}
+    exec(code, local_scope, local_scope)
+    receber = local_scope.get("receber")
+    if not callable(receber):
+        raise RuntimeError("Script do hook não expõe receber(payload, headers).")
+
+    try:
+        result = await asyncio.to_thread(lambda: receber(payload, headers or {}))
+    except TypeError:
+        result = await asyncio.to_thread(lambda: receber(payload))
+
+    if inspect.isawaitable(result):
+        result = await result
+
+    return result
 
 def _parse_json_sequence(text: str) -> Tuple[List[Any], str]:
     decoder = json.JSONDecoder()

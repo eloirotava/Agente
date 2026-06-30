@@ -342,6 +342,82 @@ DEFAULT_LOG_PERSIST_CODE = r'''async def salvar_log(mensagem, log_raciocinio, re
     )
 '''
 
+DEFAULT_HTTP_ROUTES_CODE = r'''async def rotear(request, path, cfg, helpers):
+    import json
+    from app.db import get_all_logs, get_conn
+
+    HTMLResponse = helpers["HTMLResponse"]
+    RedirectResponse = helpers["RedirectResponse"]
+    templates = helpers["templates"]
+
+    def render_assistant_html(html, **values):
+        rendered = html or ""
+        for key, value in values.items():
+            rendered = rendered.replace("{{ " + key + " }}", str(value))
+            rendered = rendered.replace("{{" + key + "}}", str(value))
+        return rendered
+
+    if path == "chat" and request.method == "GET":
+        html = (cfg.get("assistant_html_code") or "").strip()
+        if html:
+            return HTMLResponse(render_assistant_html(
+                html, answer="", error="", logs_json="[]", assistant_payload_json="{}"
+            ))
+        return templates.TemplateResponse(request=request, name="chat.html", context={})
+
+    if path == "chat" and request.method == "POST":
+        code = (cfg.get("assistant_handler_code") or "").strip()
+        if code:
+            scope = {"json": json}
+            async def processar_orquestracao(*args, **kwargs):
+                return await helpers["processar_orquestracao"](*args, **kwargs)
+            html = cfg.get("assistant_html_code") or ""
+            scope.update({
+                "processar_orquestracao": processar_orquestracao,
+                "render_html": lambda **values: HTMLResponse(render_assistant_html(html, **values)),
+                "json": json,
+            })
+            exec(code, scope, scope)
+            fn = scope.get("atender") or scope.get("executar") or scope.get("handle")
+            if not callable(fn):
+                return HTMLResponse("assistant_handler_code sem atender(...)", status_code=500)
+            result = fn(request, cfg, {
+                "processar_orquestracao": processar_orquestracao,
+                "render_html": lambda **values: HTMLResponse(render_assistant_html(html, **values)),
+                "json": json,
+            })
+            if hasattr(result, "__await__"):
+                result = await result
+            return result
+
+        form = await request.form()
+        message = form.get("message") or ""
+        resultado = await helpers["processar_orquestracao"](mensagem=message, origem="Chat")
+        return templates.TemplateResponse(request=request, name="chat.html", context={
+            "message": message, "answer": resultado["resposta_final"], "logs": resultado["logs"]
+        })
+
+    if path == "logs" and request.method == "GET":
+        return templates.TemplateResponse(request=request, name="logs.html", context={
+            "logs": get_all_logs(),
+            "cleared": request.query_params.get("cleared"),
+        })
+
+    if path == "logs/clear" and request.method == "POST":
+        with get_conn() as c:
+            c.execute("DELETE FROM interactions_log")
+            c.commit()
+        return RedirectResponse(url="/logs?cleared=1", status_code=303)
+
+    if path.startswith("hook/") and request.method == "POST":
+        slug = path.split("/", 1)[1]
+        payload = await request.json()
+        result = await helpers["dispatch_hook"](slug, payload, dict(request.headers))
+        return {"ok": True, "hook": slug, "result": result}
+
+    return HTMLResponse(f"Rota não configurada: /{path}", status_code=404)
+'''
+
 DEFAULTS = {
     "llm_provider_code": DEFAULT_LLM_PROVIDER_CODE,
     "assistant_html_code": DEFAULT_ASSISTANT_HTML_CODE,
@@ -352,5 +428,6 @@ DEFAULTS = {
     "scheduler_default_hook_slug": "",
     "scheduler_dispatch_code": "",
     "maestro_core_code": "",
-    "log_persist_code": DEFAULT_LOG_PERSIST_CODE
+    "log_persist_code": DEFAULT_LOG_PERSIST_CODE,
+    "http_routes_code": DEFAULT_HTTP_ROUTES_CODE
 }

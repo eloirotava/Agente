@@ -23,6 +23,7 @@
         <a class="btn secondary-btn" href="#modelo">Modelo</a>
         <a class="btn secondary-btn" href="#assistente">Assistente</a>
         <a class="btn secondary-btn" href="#observabilidade">Logs</a>
+        <a class="btn secondary-btn" href="#rotas-http">Rotas HTTP</a>
         <a class="btn secondary-btn" href="#runtime">Runtime</a>
         <a class="btn secondary-btn" href="#agenda">Agenda</a>
         <a class="btn secondary-btn" href="#historico-config">Histórico</a>
@@ -76,6 +77,21 @@
         </div>
         <label>Def de persistência do log</label>
         <textarea name="log_persist_code" rows="12" class="code" placeholder="async def salvar_log(mensagem, log_raciocinio, resposta_final, cfg, helpers):&#10;    helpers['default_log_interaction'](mensagem, log_raciocinio, resposta_final)">{{ cfg.log_persist_code }}</textarea>
+    </div>
+
+    <div class="panel" id="rotas-http">
+        <div class="panel-header">
+            <div>
+                <h2>Rotas HTTP configuráveis</h2>
+                <p>Defina como caminhos como /chat, /logs e /hook/... respondem. Assim os routers físicos podem sumir e o comportamento fica no banco.</p>
+            </div>
+            <span class="badge">def rotas</span>
+        </div>
+        <div class="alert info">
+            Defina <code>rotear(request, path, cfg, helpers)</code>. Retorne HTMLResponse, JSONResponse, RedirectResponse, dict ou string.
+        </div>
+        <label>Def das rotas HTTP</label>
+        <textarea name="http_routes_code" rows="18" class="code" placeholder="async def rotear(request, path, cfg, helpers):&#10;    return helpers['HTMLResponse']('ok')">{{ cfg.http_routes_code }}</textarea>
     </div>
 
     <div class="panel" id="runtime">

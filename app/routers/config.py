@@ -50,6 +50,7 @@ def config_post(
     scheduler_dispatch_code: str = Form(""),
     maestro_core_code: str = Form(""),
     log_persist_code: str = Form(""),
+    http_routes_code: str = Form(""),
     change_note: str = Form("")
 ):
     save_config({
@@ -62,7 +63,8 @@ def config_post(
         "scheduler_default_hook_slug": scheduler_default_hook_slug,
         "scheduler_dispatch_code": scheduler_dispatch_code,
         "maestro_core_code": maestro_core_code,
-        "log_persist_code": log_persist_code
+        "log_persist_code": log_persist_code,
+        "http_routes_code": http_routes_code
     }, change_note=change_note)
     return templates.TemplateResponse(
         request=request,

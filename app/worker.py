@@ -230,7 +230,7 @@ async def _executar_dispatch_agenda_customizado(
         )
 
     async def chamar_hook(slug: str, payload: dict | None = None, headers: dict | None = None):
-        from app.routers.hooks import dispatch_hook
+        from app.core import dispatch_hook
 
         return await dispatch_hook(
             slug,
